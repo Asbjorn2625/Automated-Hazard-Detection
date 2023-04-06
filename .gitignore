@@ -3,5 +3,5 @@ images/
 
 # ignore trained images
 *.pb
-
+# Ignore the idea map from pycharm
 *.idea
