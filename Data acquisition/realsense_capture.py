@@ -53,10 +53,10 @@ try:
         if key == ord('s'):
             curr_index += 1
             # Save the RGB image
-            cv2.imwrite("rgb_image_{:04d}.jpg".format(curr_index), color_image)
+            cv2.imwrite("data/rgb_image_{:04d}.jpg".format(curr_index), color_image)
 
             # Save the depth image
-            cv2.imwrite("depth_image_{:04d}.raw".format(curr_index), depth_image)
+            depth_image.tofile("data/depth_image_{:04d}.raw".format(curr_index))
         elif key == ord('q'):
             break
 finally:
