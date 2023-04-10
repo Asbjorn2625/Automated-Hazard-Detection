@@ -15,13 +15,13 @@ def resize_image(image, image_name, procent):
 image_names = [f'./data/{img}' for img in os.listdir("./data") if img.startswith("rgb_image")]
 
 # Load the intrinsics
-mtx, dist = np.load("calibration.npz")
+calibs = np.load("calibration.npz")
 
 # Loop through the images
 for image in image_names:
     img = cv2.imread(image)
     # Undistort an image
-    img_undistorted = cv2.undistort(img, mtx, dist)
+    img_undistorted = cv2.undistort(img, calibs["mtx"], calibs["dist"])
 
     resize_image(img_undistorted, "result", 0.4)
     cv2.waitKey(0)

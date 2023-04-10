@@ -20,7 +20,7 @@ config = rs.config()
 
 # Add the RGB and depth streams to the configuration
 config.enable_stream(rs.stream.color, 1920, 1080, rs.format.bgr8, 15)
-config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 15)
+config.enable_stream(rs.stream.depth, int(1920/3), int(1080/3), rs.format.z16, 15)
 
 # Start the pipeline
 pipeline.start(config)
@@ -53,7 +53,7 @@ try:
         if key == ord('s'):
             curr_index += 1
             # Save the RGB image
-            cv2.imwrite("data/rgb_image_{:04d}.jpg".format(curr_index), color_image)
+            cv2.imwrite("data/rgb_image_{:04d}.png".format(curr_index), color_image)
 
             # Save the depth image
             depth_image.tofile("data/depth_image_{:04d}.raw".format(curr_index))
