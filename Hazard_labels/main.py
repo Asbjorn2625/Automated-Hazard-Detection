@@ -1,5 +1,6 @@
 from pytesseract import *
 import cv2
+from textblob import TextBlob
 import numpy as np
 import math
 from imutils.object_detection import non_max_suppression
@@ -20,20 +21,27 @@ class Hazard_labels:
         testImages = os.listdir("%s/%s" % (os.getcwd().replace("\\","/"), self.image_folder))
         # minimum confidence of text detection
         results = {"image": []}
+        OCR = None
         for image_paths in testImages:
             image = cv2.imread("%s/%s/%s" % (os.getcwd(),self.image_folder, image_paths))
-            procesed = self.preProces(image)
+            procesed, orig = self.preProces(image)
+
             ROIs = self.EAST(procesed, min_conf_EAST)
+            '''
             for ROI in ROIs:
                 textarea = procesed[ROI[1]:ROI[3], ROI[0]:ROI[2]]
-                OCR = self.tesseract(textarea, min_conf_tesseract)
                 cv2.imshow("ROI", textarea)
-                key = cv2.waitKey(1)
+                cv2.imshow("pre", procesed)
+                cv2.imshow("IMA", orig)
+            '''
+            OCR = self.tesseract(procesed, min_conf_tesseract)
+            key = cv2.waitKey(0)
             results["image"].append([image_paths, OCR])
         return results
 
 
     def preProces(self, image):
+        original = image.copy()
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         gray = cv2.GaussianBlur(gray, (3, 3), 0)
         ret3, th3 = cv2.threshold(gray, 0, 220, cv2.THRESH_TRUNC + cv2.THRESH_OTSU)
@@ -71,7 +79,7 @@ class Hazard_labels:
                             y = slope1 * x + intercept1
                             diamond_candidates.append([line1[0], line1[1], int(x), int(y)])
         for lines in diamond_candidates:
-            cv2.line(edges, (lines[0], lines[1]), (lines[2], lines[3]), (0, 255, 0), 10)
+            cv2.line(edges, (lines[0], lines[1]), (lines[2], lines[3]), (0, 255, 0), 8)
 
         # Define the structuring elements for dilation and erosion
         # Apply morphological operations to remove noise and fill gaps
@@ -80,20 +88,52 @@ class Hazard_labels:
         erosion_kernel = np.ones((2, 2), np.uint8)
         morph_img = cv2.erode(morph_img, erosion_kernel, iterations=2)
 
+
         # Find contours of the edges
-        contours, hierarchy = cv2.findContours(morph_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours, hierarchy = cv2.findContours(morph_img, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
         # Create a black image to use as a mask for drawing filled contours
         mask = np.zeros_like(morph_img)
+        mask1 =np.zeros_like(morph_img)
 
         for cnt in contours:
             cv2.drawContours(mask, [cnt], -1, (255, 255, 255), -1)
+            #cv2.drawContours(original, [cnt], -1, (255, 0, 255), 3)
         # Apply the mask to the original image to extract the filled letters
-        letters = cv2.bitwise_xor(morph_img, mask)
+        mask = cv2.bitwise_xor(morph_img, mask)
+        mask = cv2.erode(mask, erosion_kernel)
+        # To remove the inner contours of letters O, P, R , A etc.
+        contours1, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        # Loop through the hierarchy
+        # Loop over all the contours
+        # Loop over all the contours
+        for i, cnt in enumerate(contours1):
+            #cv2.drawContours(original, [cnt], 0, (0, 255, 0), cv2.FILLED)
+            # Get the hierarchy of the contour
+            #if i < len(hierarchy[0]):
+            h = hierarchy[0][i]
+            # Check if the contour is a letter
+            if h[3] == -1:
+                curr_hier = i
+                # Find the holes inside the letter
+                for j in range(len(contours1)):
+                    if hierarchy[0][j][3] == curr_hier:
+                        hole = contours1[j]
+                        # Fill the hole
+                        cv2.drawContours(mask1, [hole], 0, (255, 255, 255), cv2.FILLED)
+                """for j in range(h[2], -1, -1):
+                    if j < len(hierarchy[0]) and hierarchy[0][j][3] == i:
+                        hole = contours[j]
+                        # Fill the hole
+                        cv2.drawContours(original, [hole], 0, (0, 255, 0), cv2.FILLED)"""
+        mask = mask
+        mask1 = cv2.bitwise_not(mask1)
 
+        letters = cv2.bitwise_and(mask, mask1)
         # Iterate through all the contours and filter out the non-convex ones
         image = cv2.cvtColor(letters, cv2.COLOR_GRAY2BGR)
-        return image
+
+        return image, original
 
 
     def EAST(self, image, min_conf):
@@ -191,6 +231,7 @@ class Hazard_labels:
 
         # Then loop over each of the individual text
         # localizations
+
         for i in range(0, len(results["text"])):
             # We will also extract the OCR text itself along
             # with the confidence of the text localization
@@ -201,7 +242,8 @@ class Hazard_labels:
                 if not (is_only_spaces(text)):
                     # We will display the confidence and text to
                     # our terminal
-                    preds["predictions"].append(text)
+                    blob = TextBlob(text)
+                    preds["predictions"].append(blob.correct())
                     preds["Confidences"].append(conf)
         return preds
 
