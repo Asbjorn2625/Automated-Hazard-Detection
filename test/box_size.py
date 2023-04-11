@@ -54,7 +54,7 @@ with np.load("calibration.npz") as a:
 # Loop through the images
 for image in rgb_images:
     img = cv2.imread(image)
-    depth = np.fromfile(image.replace("rgb_image","depth_image").replace("png", "raw"), dtype=np.uint16)
+    depth = np.fromfile(image.replace("rgb_image", "depth_image").replace("png", "raw"), dtype=np.uint16)
     # Reconstruct the depth map
     depth = depth.reshape(int(1080/3), int(1920/3))
     # Undistort an image
@@ -70,50 +70,19 @@ for image in rgb_images:
     inpaint_radius = 5  # adjust this to set the inpainting radius
     depth_undistorted = cv2.inpaint(depth_undistorted, missing_data.astype(np.uint8), inpaint_radius, inpaint_method)
 
-    # Threshold the depth image
-    lower_threshold = 500  # adjust this to set the lower threshold value
-    upper_threshold = 700  # adjust this to set the upper threshold value
-    binary_image = cv2.inRange(depth_undistorted, lower_threshold, upper_threshold)
+    # Get a mask of the background from depth image
+    background_depth = np.max(depth_undistorted[400:, 300:])
+    print(background_depth)
+    mask = depth_undistorted > background_depth - 200
 
-    # Apply a morphological closing operation
-    kernel_size = 10  # adjust this to set the size of the structuring element
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
-    closed_image = cv2.morphologyEx(binary_image, cv2.MORPH_CLOSE, kernel)
-
-    # Find the contours of the objects
-    contours, hierarchy = cv2.findContours(closed_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    # Create a color image to use for visualization
-    color_image = cv2.cvtColor(closed_image, cv2.COLOR_GRAY2BGR)
-
-    # Process each contour separately
-    for i, contour in enumerate(contours):
-        # Approximate the contour with a polygon
-        epsilon = 0.01 * cv2.arcLength(contour, True)
-        approx = cv2.approxPolyDP(contour, epsilon, True)
-
-        # Compute the size of the box
-        distances = []
-        for i in range(len(approx)):
-            for j in range(i + 1, len(approx)):
-                distance = np.sqrt(np.sum((approx[i][0] - approx[j][0]) ** 2))
-                distances.append(distance)
-
-        box_size = max(distances)
-
-        # Draw the contour and box on the color image
-        color = (0, 0, 255)  # red
-        cv2.drawContours(color_image, [contour], -1, color, 2)
-        cv2.putText(color_image, f"Box {i + 1}: size = {box_size:.2f}", tuple(approx[0][0]), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5, color, 2, cv2.LINE_AA)
-        for j in range(len(approx)):
-            cv2.circle(color_image, tuple(approx[j][0]), 3, color, -1)
-
-        # Show the images and wait for a key press
-        resize_image(binary_image.astype(np.uint8), "Thresholded image", 0.4)
-        resize_image(closed_image, "Closed image", 0.4)
-        resize_image(color_image, "Contours", 0.4)
-        cv2.waitKey(0)
+    # Get gray image
+    gray = cv2.cvtColor(img_undistorted, cv2.COLOR_BGR2GRAY)
+    # Remove the mask from the color image
+    gray[mask] = 0
+    # Get the edges of the color image
+    edges = cv2.Canny(gray, 50, 200)
+    # Display the edges
+    resize_image(gray, "edges", 0.4)
 
     # Get the depth in color for display
     d_img = depth_to_display(depth_undistorted)

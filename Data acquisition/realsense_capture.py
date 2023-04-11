@@ -23,7 +23,21 @@ config.enable_stream(rs.stream.color, 1920, 1080, rs.format.bgr8, 15)
 config.enable_stream(rs.stream.depth, int(1920/3), int(1080/3), rs.format.z16, 15)
 
 # Start the pipeline
-pipeline.start(config)
+profile = pipeline.start(config)
+
+# Getting the depth sensor's depth scale (see rs-align example for explanation)
+depth_sensor = profile.get_device().first_depth_sensor()
+depth_scale = depth_sensor.get_depth_scale()
+print("Depth Scale is: " , depth_scale)
+
+# We will be removing the background of objects more than
+#  clipping_distance_in_meters meters away
+clipping_distance_in_meters = 1.5  #1 meter
+clipping_distance = clipping_distance_in_meters / depth_scale
+
+# Create an align object
+align_to = rs.stream.color
+align = rs.align(align_to)
 
 try:
     # Get the list of existing RGB and Depth image files in the save directory
@@ -38,16 +52,26 @@ try:
         # Wait for the next set of frames from the camera
         frames = pipeline.wait_for_frames()
 
-        # Get the RGB and depth frames
-        color_frame = frames.get_color_frame()
-        depth_frame = frames.get_depth_frame()
+        # Align the depth frame to color frame
+        aligned_frames = align.process(frames)
 
-        # Convert the RGB frame to a numpy array
-        color_image = np.asanyarray(color_frame.get_data())
+        # Get aligned frames
+        aligned_depth_frame = aligned_frames.get_depth_frame()  # aligned_depth_frame is a 640x480 depth image
+        color_image = aligned_frames.get_color_frame()
 
-        # Convert the depth frame to a numpy array
-        depth_image = np.asanyarray(depth_frame.get_data())
+        # Get data from images
+        color_image = np.asanyarray(color_image.get_data())
+        depth_image = np.asanyarray(aligned_depth_frame.get_data())
 
+        # Get a displayable depth image
+        depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+
+        # Remove background - Set pixels below the threshold as black
+        grey_color = 0
+        color_image[np.where((depth_image > clipping_distance) | (depth_image < 10))] = grey_color
+
+        # Display the images
+        resize_image(depth_colormap, 'depth', 0.4)
         resize_image(color_image, 'color', 0.4)
         key = cv2.waitKey(1)
         if key == ord('s'):
