@@ -28,11 +28,11 @@ profile = pipeline.start(config)
 # Getting the depth sensor's depth scale (see rs-align example for explanation)
 depth_sensor = profile.get_device().first_depth_sensor()
 depth_scale = depth_sensor.get_depth_scale()
-print("Depth Scale is: " , depth_scale)
+print("Depth Scale is: ", depth_scale)
 
 # We will be removing the background of objects more than
 #  clipping_distance_in_meters meters away
-clipping_distance_in_meters = 1.5  #1 meter
+clipping_distance_in_meters = 1.5  # 1.5 meter
 clipping_distance = clipping_distance_in_meters / depth_scale
 
 # Create an align object
@@ -68,11 +68,12 @@ try:
 
         # Remove background - Set pixels below the threshold as black
         grey_color = 0
-        color_image[np.where((depth_image > clipping_distance) | (depth_image < 10))] = grey_color
+        temp_image = color_image.copy()
+        temp_image[np.where((depth_image > clipping_distance) | (depth_image < 10))] = grey_color
 
         # Display the images
         resize_image(depth_colormap, 'depth', 0.4)
-        resize_image(color_image, 'color', 0.4)
+        resize_image(temp_image, 'color', 0.4)
         key = cv2.waitKey(1)
         if key == ord('s'):
             curr_index += 1
@@ -81,6 +82,7 @@ try:
 
             # Save the depth image
             depth_image.tofile("data/depth_image_{:04d}.raw".format(curr_index))
+            
         elif key == ord('q'):
             break
 finally:
