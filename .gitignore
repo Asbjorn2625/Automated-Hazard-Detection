@@ -1,7 +1,12 @@
 # ignore ALL files in ANY directory named images
 images/
 
+
 # ignore trained images
 *.pb
+
+#ignore the cache
+*.pyc
+
 # Ignore the idea map from pycharm
 *.idea

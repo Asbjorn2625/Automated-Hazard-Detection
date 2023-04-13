@@ -4,19 +4,18 @@ from PIL import Image, ImageEnhance, ImageFilter
 import tensorflow as tf
 import tensorflow_hub as hub
 
-class preProcess:
-    def __init__(self,image_stream):
-        self.image_folder = image_stream
+
+class PreProcess:
+    def __init__(self, fetched_images):
+        self.image_fetcher = fetched_images
         self.counter = 0
         self.model = None
         self.esrgn_path = "https://tfhub.dev/captain-pool/esrgan-tf2/1"
 
-
-
     def load_model(self):
-    if self.counter == 0:
-        self.model = hub.load(self.esrgn_path)
-        self.counter += 1
+        if self.counter == 0:
+            self.model = hub.load(self.esrgn_path)
+            self.counter += 1
 
 
     def preprocessing(self, img):
@@ -45,4 +44,35 @@ class preProcess:
         # Convert back to numpy.ndarray
         image = cv2.cvtColor(np.array(sharpened_img), cv2.COLOR_RGB2BGR)
         return image
-
+    
+    def transform(self, image):
+        original = image.copy()
+        grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        ret, thr = cv2.threshold(grey, 0, 200, cv2.THRESH_BINARY)
+        contours, hierarchy = cv2.findContours(thr, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        Roi = []
+        for cnt in contours:
+            # Get the bounding rectangle of the contour
+            x, y, w, h = cv2.boundingRect(cnt)
+            # Extract the four corner coordinates of the ROI
+            xStart = x
+            xEnd = x + w
+            yStart = y
+            yEnd = y + h
+            Roi.append([xStart, yStart, xEnd, yEnd])
+        return Roi
+    
+    def process_images(self):
+        images = self.image_fetcher
+        for image in images:
+            outerbounds = self.transform(image)
+            for bounds in outerbounds:
+                diamond = image[bounds[1]:bounds[3], bounds[0]:bounds[2]]
+                print(diamond.shape)
+                # Apply image enhancement
+                enhanced_image = self.image_enhancer(diamond)
+                # Apply super resolution
+                sr_image = self.srmodel(enhanced_image)
+                sr_image = tf.squeeze(sr_image).numpy() * 255.0  # convert to numpy array and scale pixel values back to [0, 255]
+                sr_image = np.clip(sr_image, 0, 255).astype(np.uint8)  # clip pixel values to [0, 255] and convert to uint8 data type
+                yield sr_image
