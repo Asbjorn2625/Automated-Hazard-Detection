@@ -4,6 +4,7 @@ from textblob import TextBlob
 import numpy as np
 import math
 from imutils.object_detection import non_max_suppression
+from PIL import Image, ImageEnhance, ImageFilter
 
 def is_only_spaces(text):
     for char in text:
@@ -23,21 +24,51 @@ class Hazard_labels:
         results = {"image": []}
         OCR = None
         for image_paths in testImages:
-            image = cv2.imread("%s/%s/%s" % (os.getcwd(),self.image_folder, image_paths))
+            image = cv2.imread("%s/%s/%s" % (os.getcwd(), self.image_folder, image_paths))
+            ori, outerbounds = self.transform(image)
+
+            for bounds in outerbounds:
+                textarea = ori[bounds[1]:bounds[3], bounds[0]:bounds[2]]
+                enhanced_image = self.enhance(textarea)
+                cv2.imshow("ROI", textarea)
+                cv2.imshow("enhancer", enhanced_image)
+                cv2.imshow("original", ori)
+
+                cv2.waitKey(0)
+
+            '''
             procesed, orig = self.preProces(image)
 
             ROIs = self.EAST(procesed, min_conf_EAST)
-            '''
+            
             for ROI in ROIs:
                 textarea = procesed[ROI[1]:ROI[3], ROI[0]:ROI[2]]
                 cv2.imshow("ROI", textarea)
                 cv2.imshow("pre", procesed)
                 cv2.imshow("IMA", orig)
-            '''
+            
             OCR = self.tesseract(procesed, min_conf_tesseract)
             key = cv2.waitKey(0)
             results["image"].append([image_paths, OCR])
         return results
+        '''
+    def transform(self, image):
+        original = image.copy()
+        grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        ret, thr = cv2.threshold(grey, 0, 200, cv2.THRESH_BINARY)
+        contours, hierarchy = cv2.findContours(thr, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        Roi = []
+        for cnt in contours:
+            # Get the bounding rectangle of the contour
+            x, y, w, h = cv2.boundingRect(cnt)
+            # Extract the four corner coordinates of the ROI
+            xStart = x
+            xEnd = x + w
+            yStart = y
+            yEnd = y + h
+            Roi.append([xStart, yStart, xEnd, yEnd])
+
+        return original, Roi
 
 
     def preProces(self, image):
@@ -248,5 +279,6 @@ class Hazard_labels:
         return preds
 
 test = Hazard_labels("images/classes")
-results = test.written_material()
+MARK = Hazard_labels("images/Mark_files")
+results = MARK.written_material()
 print(results)
