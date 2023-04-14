@@ -1,5 +1,5 @@
 # ignore ALL files in ANY directory named images
-images/
+images/*/
 
 
 # ignore trained images
@@ -10,6 +10,7 @@ images/
 
 #Ignoring the images
 *.png
+*.jpg
 
 # Ignore the idea map from pycharm
 *.idea
