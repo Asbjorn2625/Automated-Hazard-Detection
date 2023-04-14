@@ -8,5 +8,8 @@ images/
 #ignore the cache
 *.pyc
 
+#Ignoring the images
+*.png
+
 # Ignore the idea map from pycharm
 *.idea

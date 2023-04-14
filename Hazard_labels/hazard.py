@@ -4,6 +4,7 @@ from textblob import TextBlob
 import numpy as np
 import math
 from imutils.object_detection import non_max_suppression
+import json
 
 def is_only_spaces(text):
     for char in text:
@@ -13,31 +14,24 @@ def is_only_spaces(text):
 
 
 class Hazard_labels:
-    def __init__(self, image_stream):
-        self.image_folder = image_stream
-    def written_material(self,min_conf_EAST=0.5,min_conf_tesseract=0):
-        import os
-
-        procesed, orig = self.preProces(image)
-
-        ROIs = self.EAST(procesed, min_conf_EAST)
+    def __init__(self):
+        # Move results initialization to constructor
+        self.results = {"OCR_dic": {}}
         
-        for ROI in ROIs:
-            textarea = procesed[ROI[1]:ROI[3], ROI[0]:ROI[2]]
-            cv2.imshow("ROI", textarea)
-            cv2.imshow("pre", procesed)
-            cv2.imshow("IMA", orig)
-        
-        OCR = self.tesseract(procesed, min_conf_tesseract)
-        results["image"].append([image_paths, OCR])
-        return results
-   
+    def written_material(self, image_stream, image_name, min_conf_tesseract=0):
+        processed , th3 = self.preProces(image_stream)
+        OCR = self.tesseract(processed, min_conf_tesseract)
 
+        # Use image_name parameter instead of self.image_name
+        if image_name in self.results["OCR_dic"]:
+            self.results["OCR_dic"][image_name]["detectedWord"].update(OCR)
+        else:
+            self.results["OCR_dic"][image_name] = {"detectedWord": OCR}
+        return processed, self.results ,th3
 
     def preProces(self, image):
-        original = image.copy()
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        gray = cv2.GaussianBlur(gray, (3, 3), 0)
+        gray = cv2.GaussianBlur(gray, (5, 5), 0)
         ret3, th3 = cv2.threshold(gray, 0, 220, cv2.THRESH_TRUNC + cv2.THRESH_OTSU)
 
         # Apply Canny edge detection with threshold values of 100 and 200
@@ -45,6 +39,14 @@ class Hazard_labels:
 
         # Apply Hough transform to detect lines
         lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 200, 50, 10)
+        
+        lines_mask = cv2.cvtColor(np.zeros_like(edges), cv2.COLOR_GRAY2BGR)
+
+        if lines is not None:
+            for i in range(0, len(lines)):
+                l = lines[i][0]
+                cv2.line(lines_mask, (l[0], l[1]), (l[2], l[3]), (0,0,255), 3, cv2.LINE_AA)
+
 
         # Loop through each pair of lines detected by Hough transform
         # Identify pairs of intersecting lines with approximately the same distance and angle
@@ -115,19 +117,13 @@ class Hazard_labels:
                         hole = contours1[j]
                         # Fill the hole
                         cv2.drawContours(mask1, [hole], 0, (255, 255, 255), cv2.FILLED)
-                """for j in range(h[2], -1, -1):
-                    if j < len(hierarchy[0]) and hierarchy[0][j][3] == i:
-                        hole = contours[j]
-                        # Fill the hole
-                        cv2.drawContours(original, [hole], 0, (0, 255, 0), cv2.FILLED)"""
         mask = mask
         mask1 = cv2.bitwise_not(mask1)
 
         letters = cv2.bitwise_and(mask, mask1)
         # Iterate through all the contours and filter out the non-convex ones
         image = cv2.cvtColor(letters, cv2.COLOR_GRAY2BGR)
-
-        return image, original
+        return image ,lines_mask
 
 
     def EAST(self, image, min_conf):
@@ -218,9 +214,9 @@ class Hazard_labels:
 
 
     def tesseract(self, image, min_conf):
-
         preds = {"predictions" : [], "Confidences" : []}
         pytesseract.tesseract_cmd = "C:\Program Files\Tesseract-OCR\\tesseract.exe"
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         results = pytesseract.image_to_data(image, lang="eng", output_type=Output.DICT)
 
         # Then loop over each of the individual text
@@ -240,8 +236,3 @@ class Hazard_labels:
                     preds["predictions"].append(blob.correct())
                     preds["Confidences"].append(conf)
         return preds
-
-test = Hazard_labels("images/classes")
-MARK = Hazard_labels("images/Mark_files")
-results = MARK.written_material()
-print(results)

@@ -46,7 +46,6 @@ class PreProcess:
         return image
     
     def transform(self, image):
-        original = image.copy()
         grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         ret, thr = cv2.threshold(grey, 0, 200, cv2.THRESH_BINARY)
         contours, hierarchy = cv2.findContours(thr, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -63,16 +62,14 @@ class PreProcess:
         return Roi
     
     def process_images(self):
-        images = self.image_fetcher
-        for image in images:
-            outerbounds = self.transform(image)
+        for name, Image in self.image_fetcher:
+            outerbounds = self.transform(Image)
             for bounds in outerbounds:
-                diamond = image[bounds[1]:bounds[3], bounds[0]:bounds[2]]
-                print(diamond.shape)
+                diamond = Image[bounds[1]:bounds[3], bounds[0]:bounds[2]]
                 # Apply image enhancement
                 enhanced_image = self.image_enhancer(diamond)
                 # Apply super resolution
                 sr_image = self.srmodel(enhanced_image)
                 sr_image = tf.squeeze(sr_image).numpy() * 255.0  # convert to numpy array and scale pixel values back to [0, 255]
                 sr_image = np.clip(sr_image, 0, 255).astype(np.uint8)  # clip pixel values to [0, 255] and convert to uint8 data type
-                yield sr_image
+                yield sr_image, name
