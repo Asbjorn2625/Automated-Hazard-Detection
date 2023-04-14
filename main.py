@@ -1,6 +1,6 @@
-from Hazard_labels.hazard import Hazard_labels
-from Preprocess.prep import PreProcess
-from images.image_loader import ImageFetcher
+from Libs.Hazard_labels.hazard import Hazard_labels
+from Libs.Preprocess.prep import PreProcess
+from Libs.images.image_loader import ImageFetcher
 import cv2
 
 image_fetcher = ImageFetcher("Mark_files")
