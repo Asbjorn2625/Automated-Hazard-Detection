@@ -18,9 +18,6 @@ from utils.utils import (
     save_predictions_as_imgs,
 )
 
-# tensorboard
-#writer = SummaryWriter('runs/fashion_mnist_experiment_1')
-
 # Hyperparameters etc.
 LEARNING_RATE = 1e-4  # original 1e-4
 DEVICE = "cuda"
@@ -33,8 +30,8 @@ PIN_MEMORY = True
 LOAD_MODEL = False
 TRAIN_IMG_DIR = "Training/Data/Train_data/RGB"
 TRAIN_MASK_DIR = "Training/Data/Train_data/MASK"
-VAL_IMG_DIR = "Training/Data/Test_data/RGB"
-VAL_MASK_DIR = "Training/Data/Test_data/MASK"
+VAL_IMG_DIR = "Training/Data/Train_data/RGB"
+VAL_MASK_DIR = "Training/Data/Train_data/MASK"
 model_name = "BoxModel.pth"
 
 def train_fn(loader, model, optimizer, loss_fn, scaler):

@@ -38,12 +38,15 @@ def image_enhancer(image):
     contrast_enhanced_img = ImageEnhance.Contrast(brightened_img)
     contrast_enhanced_img = contrast_enhanced_img.enhance(1.5)
     sharpened_img = contrast_enhanced_img.filter(ImageFilter.SHARPEN)
-    # Histogram equalization
-    histogram_enhanced_img = ImageEnhance.Color(sharpened_img)
-    histogram_enhanced_img = histogram_enhanced_img.enhance(0.5)
     # Convert back to numpy.ndarray
-    image = cv2.cvtColor(np.array(histogram_enhanced_img), cv2.COLOR_RGB2BGR)
-    return image
+    image = cv2.cvtColor(np.array(sharpened_img), cv2.COLOR_RGB2BGR)
+    # Convert to HSL
+    hls_img = cv2.cvtColor(image, cv2.COLOR_BGR2HLS)
+    # Apply CLAHE to the lightness channel
+    hls_img[:, :, 1] = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8)).apply(hls_img[:, :, 1])
+    # Convert back to RGB
+    rgb_img = cv2.cvtColor(hls_img, cv2.COLOR_HLS2BGR)
+    return rgb_img
 
 images = load_images("Early_images")
 counter = 0
