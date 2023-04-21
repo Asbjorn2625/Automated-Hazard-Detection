@@ -18,6 +18,6 @@ RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
 
 # Set up Python environment
 ENV PATH=/opt/conda/bin:$PATH
-RUN pip install numpy opencv-python matplotlib tqdm scikit-learn tensorflow keras tensorflow-hub
+RUN pip install numpy opencv-python matplotlib tqdm scikit-learn tensorflow keras tensorflow-hub pytesseract craft-text-detector
 
 COPY . .
