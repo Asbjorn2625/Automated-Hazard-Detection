@@ -10,7 +10,7 @@ from albumentations.pytorch import ToTensorV2
 import torch.utils
 from utils.model import UNET
 
-
+#hyper parameters
 HEIGHT = int(562)
 WIDTH = int(562)
 m = "TrainingModel.pth"
