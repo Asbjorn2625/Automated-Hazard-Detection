@@ -1,15 +1,6 @@
-import cv2
-import torch
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
-from torch.nn.modules import loss
 from tqdm import tqdm
-import torch.nn as nn
-import torch.optim as optim
-import torch.utils
 from utils.model import UNET
-from torch.utils.tensorboard import SummaryWriter
-import torchvision
+
 from utils.utils import (
     load_checkpoint,
     save_checkpoint,
@@ -28,6 +19,7 @@ IMAGE_HEIGHT = int(1920)  # 160*2 1280 originally
 IMAGE_WIDTH = int(1080)  # 240*2  1918 originally
 PIN_MEMORY = True
 LOAD_MODEL = False
+
 TRAIN_IMG_DIR = "Training/Data/Train_data/RGB"
 TRAIN_MASK_DIR = "Training/Data/Train_data/MASK"
 VAL_IMG_DIR = "Training/Data/Train_data/RGB"
