@@ -1,8 +1,8 @@
 import torch
 import torchvision
-from Initial_unet.utils.dataset import CrackDataset
+from utils.dataset import CrackDataset
 from torch.utils.data import DataLoader
-from Initial_unet.utils.model import UNET
+from utils.model import UNET
 
 def save_checkpoint(state, filename="TrainingModel.pth"):
     print("=> Saving checkpoint")

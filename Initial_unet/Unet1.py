@@ -1,15 +1,6 @@
-import cv2
-import torch
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
-from torch.nn.modules import loss
 from tqdm import tqdm
-import torch.nn as nn
-import torch.optim as optim
-import torch.utils
 from utils.model import UNET
-from torch.utils.tensorboard import SummaryWriter
-import torchvision
+
 from utils.utils import (
     load_checkpoint,
     save_checkpoint,
@@ -17,9 +8,6 @@ from utils.utils import (
     check_accuracy,
     save_predictions_as_imgs,
 )
-
-# tensorboard
-#writer = SummaryWriter('runs/fashion_mnist_experiment_1')
 
 # Hyperparameters etc.
 LEARNING_RATE = 1e-4  # original 1e-4
@@ -31,10 +19,11 @@ IMAGE_HEIGHT = int(1920)  # 160*2 1280 originally
 IMAGE_WIDTH = int(1080)  # 240*2  1918 originally
 PIN_MEMORY = True
 LOAD_MODEL = False
+
 TRAIN_IMG_DIR = "Training/Data/Train_data/RGB"
 TRAIN_MASK_DIR = "Training/Data/Train_data/MASK"
-VAL_IMG_DIR = "Training/Data/Test_data/RGB"
-VAL_MASK_DIR = "Training/Data/Test_data/MASK"
+VAL_IMG_DIR = "Training/Data/Train_data/RGB"
+VAL_MASK_DIR = "Training/Data/Train_data/MASK"
 model_name = "BoxModel.pth"
 
 def train_fn(loader, model, optimizer, loss_fn, scaler):
