@@ -12,7 +12,7 @@ from utils.model import UNET
 
 HEIGHT = int(562)
 WIDTH = int(562)
-m = "TrainingModel.pth"
+m = "Label.pth"
 DEVICE = "cuda"
 model = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(DEVICE)
 print("loading model")
