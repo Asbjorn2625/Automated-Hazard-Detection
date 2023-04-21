@@ -5,8 +5,7 @@ import cv2
 from craft_text_detector import Craft
 import torch
 from pytesseract import *
-print(torch.cuda.is_available())
-exit()
+
 
 def extract_text(image, box, padding=10):
     x1, y1 = box[0]
@@ -32,35 +31,39 @@ def extract_text(image, box, padding=10):
 
     cropped_image = image[ymin:ymax, xmin:xmax]
 
-
     # Convert to grayscale
     gray = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY)
-    #equalized_image = cv2.equalizeHist(gray)
 
-    # Apply adaptive thresholding
-    thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
+    scale_factor = 2
+    resized_image = cv2.resize(gray, (gray.shape[1] * scale_factor, gray.shape[0] * scale_factor), interpolation=cv2.INTER_LANCZOS4)
 
-    # Remove noise using morphological operations
-    kernel = np.ones((2, 2), np.uint8)
-    denoised = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
-    denoised = cv2.morphologyEx(denoised, cv2.MORPH_CLOSE, kernel)
+    blurred_image = cv2.GaussianBlur(resized_image, (3, 3), 0)
 
-    # Dilate text regions
-    dilated = cv2.dilate(denoised, kernel, iterations=1)
-    # Show the preprocess
-    resize_image(thresh, "tresh", 1)
-    resize_image(denoised, "noise", 1)
-    resize_image(dilated, "dilated", 1)
+    # Try Otsu's thresholding instead of adaptive thresholding
+    _, thresh = cv2.threshold(resized_image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
-    # init tesseract
-    #results = pytesseract.image_to_data(image, lang="eng", output_type=Output.DICT)
-    text = pytesseract.image_to_string(dilated)
+    kernel = np.ones((3, 3), np.uint8)  # Increase the kernel size
+    eroded_image = cv2.erode(thresh, kernel, iterations=1)
+    dilated_image = cv2.dilate(eroded_image, kernel, iterations=1)
+
+    # Display the process
+    resize_image(gray, "cropped_image", 0.4)
+    resize_image(thresh, "gray", 0.4)
+    resize_image(dilated_image, "equalized_image", 0.4)
+
+    # Set Tesseract configuration to focus on alphanumeric characters
+    config = '-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./- --psm 4 --oem 3'
+    text = pytesseract.image_to_string(dilated_image, config=config)
     return text.strip()
 
 
 # Create list of image filenames
 rgb_images = [f'./text_test/{img}' for img in os.listdir("./text_test") if img.startswith("rgb_image")]
 
+# Load the pre-trained CRAFT model
+craft = Craft("cuda:0" if torch.cuda.is_available() else "cpu")  # Use GPU if available, otherwise use CPU
+# Load the OCR model
+pytesseract.tesseract_cmd = "C:\Program Files\Tesseract-OCR\\tesseract.exe"
 
 # Loop through images
 for image in rgb_images:
@@ -68,11 +71,6 @@ for image in rgb_images:
     # Rotate image
     img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
     orig = img.copy()
-
-    # Load the pre-trained CRAFT model
-    craft = Craft("cuda:0" if torch.cuda.is_available() else "cpu")  # Use GPU if available, otherwise use CPU
-    # Load the OCR model
-    pytesseract.tesseract_cmd = "C:\Program Files\Tesseract-OCR\\tesseract.exe"
 
     # Detect text regions
     prediction_result = craft.detect_text(img)
@@ -98,6 +96,6 @@ for image in rgb_images:
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-    # Release the CRAFT model
-    craft.unload_craftnet_model()
-    craft.unload_refinenet_model()
+# Release the CRAFT model
+craft.unload_craftnet_model()
+craft.unload_refinenet_model()
