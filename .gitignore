@@ -11,6 +11,7 @@ images/*/
 #Ignoring the images
 *.png
 *.jpg
+*.raw
 
 # Ignore the idea map from pycharm
 *.idea

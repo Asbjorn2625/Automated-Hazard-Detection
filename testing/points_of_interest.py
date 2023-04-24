@@ -5,8 +5,9 @@ from scipy.signal import find_peaks
 
 
 
-file_path = 'C:\\Users\\dadih\\OneDrive\\Desktop\\P6-points-of-intrests\\very_early_package_images\\pic_name.txt'
-os_path = 'C:\\Users\\dadih\\OneDrive\\Desktop\\P6-points-of-intrests\\P6\\first alligned depth images'
+
+file_path = 'C:\\Users\\dadih\\OneDrive\\Desktop\\P6-points-of-intrests\\P6\\Automated-Hazard-Detection\\testing\image_name\\filenames.txt'
+os_path = 'C:\\Users\\dadih\\OneDrive\\Desktop\\P6-points-of-intrests\\P6\\Automated-Hazard-Detection\\testing\\outline_of_hazard_labels'
 
 with open(file_path, 'r') as file:
     lines = file.readlines()
@@ -72,12 +73,18 @@ for line in lines:
     peaks, _ = find_peaks(hist.ravel(), height=0)
 
 
+
     # Set the threshold level to the minimum value between the two peaks
     thresh = np.min(peaks)
 
     #applying the histogram threshold to the image
     hist_thresh = cv.threshold(sobel_gray, thresh, 255, cv.THRESH_BINARY)[1]
 
+    # Compute the distance transform
+    dist_transform = cv.distanceTransform(hist_thresh, cv.DIST_L2, 5)
+
+    # Threshold the distance transform
+    ret, skeleton = cv.threshold(dist_transform, 0.4 * dist_transform.max(), 255, 0)
 
     # Define the minimum and maximum component sizes (in pixels)
     min_size = 600
@@ -145,8 +152,8 @@ for line in lines:
     plt.title('Original Image'), plt.xticks([]), plt.yticks([])
     plt.subplot(222), plt.imshow(cleaned_image, vmin=0, vmax=255)
     plt.title('Hls Thresholding'), plt.xticks([]), plt.yticks([])
-    plt.subplot(223), plt.imshow(mask, cmap='gray', vmin=0, vmax=255)
-    plt.title('Sobel histogram thresholding'), plt.xticks([]), plt.yticks([])
+    plt.subplot(223), plt.imshow(skeleton, cmap='gray', vmin=0, vmax=255)
+    plt.title('skeleton'), plt.xticks([]), plt.yticks([])
     plt.subplot(224), plt.imshow(hist_thresh, cmap="gray", vmin=0, vmax=255)
     plt.title('hist thresh'), plt.xticks([]), plt.yticks([])
     print(number_of_components)
