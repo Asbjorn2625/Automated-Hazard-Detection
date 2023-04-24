@@ -1,0 +1,7 @@
+Cython
+numpy opencv-python
+matplotlib
+tqdm scikit-learn
+tensorflow keras tensorflow-hub
+pytesseract
+craft-text-detector
