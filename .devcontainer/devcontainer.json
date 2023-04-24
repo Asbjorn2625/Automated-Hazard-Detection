@@ -1,0 +1,20 @@
+{
+    "name": "Python OpenCV",
+    "build": {
+      "dockerfile": "../Dockerfile"
+    },
+    "runArgs": [
+      "--network=host",
+      "-e", "DISPLAY=host.docker.internal:0.0"
+    ],
+    "settings": {
+      "terminal.integrated.defaultProfile.linux": "/bin/bash"
+    },
+    "extensions": [
+      "ms-python.python",
+      "formulahendry.code-runner",
+      "kevinrose.vsc-python-indent",
+      "github.copilot",
+      "ms-azuretools.vscode-docker"
+    ]
+}
