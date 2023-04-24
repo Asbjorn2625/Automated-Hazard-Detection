@@ -17,6 +17,7 @@ from utils.utils import (
     check_accuracy,
     save_predictions_as_imgs,
 )
+from utils.Dice import DiceLoss
 
 # Hyperparameters etc.
 LEARNING_RATE = 1e-4  # original 1e-4
