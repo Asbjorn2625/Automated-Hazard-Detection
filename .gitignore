@@ -9,8 +9,10 @@ images/*/
 *.pyc
 
 #Ignoring the images
-*.png
-*.jpg
+**.png
+**.jpg
+**.raw
 
 # Ignore the idea map from pycharm
 *.idea
+*.vscode
