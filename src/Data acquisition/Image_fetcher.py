@@ -41,7 +41,13 @@ class ImageFetcher:
                 file_nr2=j[0].replace(".raw","").replace("Dataset/","").split("_")[2]
                 if file_nr1 == file_nr2:
                     images.append((cv2.bitwise_and(i[1], i[1], mask=j[2]),cv2.bitwise_and(j[1], j[1], mask=j[2])))
-        return images
+        rgb_images = [img[0] for img in images]
+        depth_images = [img[1] for img in images]
+        return rgb_images, depth_images
+    def get_rgb_images(self):
+        return [img[1] for img in self.RGBimages]
+    def get_depth_images(self):
+        return [img[1] for img in self.depthImages]
 
 
 
