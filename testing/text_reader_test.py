@@ -3,7 +3,6 @@ sys.path.append('/workspaces/P6-Automated-Hazard-Detection')
 
 import os
 import numpy as np
-from Libs.Preprocess.processing_functions import resize_image
 import cv2
 from craft_text_detector import Craft
 from pytesseract import *
@@ -144,7 +143,7 @@ for image in rgb_images:
         cv2.polylines(orig, [box], True, (0, 255, 0), 2)
 
     # Display the output image
-    resize_image(orig, "result", 0.4)
+    #resize_image(orig, "result", 0.4)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 

@@ -3,7 +3,7 @@ from textblob import TextBlob
 import numpy as np
 import math
 from src.Segmentation.segmentation import Segmentation
-from src.Text_reader.Read import ReadText
+from Text_reader.ReaderClass import ReadText
 
 def is_only_spaces(text):
     for char in text:
