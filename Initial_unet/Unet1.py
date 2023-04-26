@@ -18,6 +18,7 @@ from utils.utils import (
     save_predictions_as_imgs,
 )
 from utils.Dice import DiceLoss
+import os
 
 # Hyperparameters etc.
 LEARNING_RATE = 1e-4  # original 1e-4
@@ -25,16 +26,16 @@ DEVICE = "cuda"
 BATCH_SIZE = 1
 NUM_EPOCHS = 70
 NUM_WORKERS = 4
-IMAGE_HEIGHT = int(1920)  # 160*2 1280 originally
-IMAGE_WIDTH = int(1080)  # 240*2  1918 originally
+IMAGE_HEIGHT = int(1920/2)  # 160*2 1280 originally
+IMAGE_WIDTH = int(1080/2)  # 240*2  1918 originally
 PIN_MEMORY = True
 LOAD_MODEL = False
 
-TRAIN_IMG_DIR = "Training/Data/Train_data/RGB"
-TRAIN_MASK_DIR = "Training/Data/Train_data/MASK"
-VAL_IMG_DIR = "Training/Data/Train_data/RGB"
-VAL_MASK_DIR = "Training/Data/Train_data/MASK"
-model_name = "BoxModel.pth"
+TRAIN_IMG_DIR = os.getcwd().replace("\\", "/") + "/Initial_unet/Training/train_rgb"
+TRAIN_MASK_DIR = os.getcwd().replace("\\", "/")  + "/Initial_unet/Training/train_mask"
+VAL_IMG_DIR = os.getcwd().replace("\\", "/")  + "/Initial_unet/Training/test_rgb"
+VAL_MASK_DIR = os.getcwd().replace("\\", "/")  + "/Initial_unet/Training/test_mask"
+model_name = os.getcwd().replace("\\", "/") + "UNmodel.pth"
 
 def train_fn(loader, model, optimizer, loss_fn, scaler):
     loop = tqdm(loader)
@@ -97,7 +98,7 @@ def main():
     )
 
     model = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(DEVICE)
-    loss_fn = nn.BCEWithLogitsLoss()
+    loss_fn = DiceLoss()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
     train_loader, val_loader = get_loaders(
@@ -142,7 +143,7 @@ def main():
 
             # print some examples to a folder
             save_predictions_as_imgs(
-                val_loader, model, folder="Training\Images", device=DEVICE
+                val_loader, model, folder = os.getcwd().replace("\\", "/") + "/Initial_unet/Training/Images", device=DEVICE
             )
 
         if epoch == 30:
