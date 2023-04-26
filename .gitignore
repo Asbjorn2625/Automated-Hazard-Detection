@@ -12,6 +12,8 @@ images/*/
 **.png
 **.jpg
 **.raw
+# Ignore the craft output
+**/cuda0/
 
 # Ignore the idea map from pycharm
 *.idea

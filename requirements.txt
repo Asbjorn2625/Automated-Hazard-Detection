@@ -1,7 +1,10 @@
 Cython
-numpy opencv-python
+numpy==1.21.5 
 matplotlib
-tqdm scikit-learn
-tensorflow keras tensorflow-hub
+tqdm 
+scikit-learn
+scikit-image
+scipy
+keras 
 pytesseract
 craft-text-detector
