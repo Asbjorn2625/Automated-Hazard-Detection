@@ -1,9 +1,9 @@
-from pytesseract import *
 import cv2
 from textblob import TextBlob
 import numpy as np
 import math
-from imutils.object_detection import non_max_suppression
+from src.Segmentation.segmentation import Segmentation
+from src.Text_reader.Read import ReadText
 
 def is_only_spaces(text):
     for char in text:
