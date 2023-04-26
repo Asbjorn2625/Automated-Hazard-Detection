@@ -11,7 +11,6 @@ def resize_image(image, image_name, procent):
     cv2.resizeWindow(image_name, int(width), int(height))
     cv2.imshow(image_name, image)
 
-
 # Create a pipeline
 pipeline = rs.pipeline()
 

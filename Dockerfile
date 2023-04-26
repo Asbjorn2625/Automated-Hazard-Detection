@@ -4,13 +4,24 @@ FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
 RUN apt-get update && apt-get install -y \
     curl \
     wget \
+    tesseract-ocr \
+    libtesseract-dev \
+    libleptonica-dev \
     libgl1-mesa-glx \
     libglib2.0-0 \
     libgtk2.0-dev \
     libavcodec-dev \
     libavformat-dev \
     libswscale-dev \
-    libtbb-dev
+    libtbb-dev \
+    pkg-config
+
+
+# Add Tesseract repository and install Tesseract
+RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash \
+    && apt-get update \
+    && apt-get install -y tesseract-ocr \
+    tesseract-ocr-eng
 
 # Install Miniconda
 RUN wget https://repo.anaconda.com/miniconda/Miniconda3-py39_4.10.3-Linux-x86_64.sh -O miniconda.sh && \
@@ -22,9 +33,10 @@ ENV PATH=/opt/conda/bin:$PATH
 RUN conda update conda -y && \
     conda create -n myenv python=3.9 -y && \
     echo "source activate myenv" > ~/.bashrc
-    
-# Set the working directory to /workspaces
-WORKDIR /workspaces/Automated-Hazard-Detection
+
+# Clean up package lists to reduce image size
+RUN apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file and the rest of the project
 COPY . .
@@ -32,7 +44,8 @@ COPY . .
 # Install pip dependencies
 RUN /bin/bash -c "source activate myenv && \
     pip install --no-cache-dir -r requirements.txt && \
-    pip install torch torchvision torchaudio -f https://download.pytorch.org/whl/cu118/torch_stable.html && \
+    pip install torch==1.13.1 -f https://download.pytorch.org/whl/cu118/torch_stable.html && \
+    pip install torchvision==0.14.1 torchaudio==0.13.1 && \
     pip install albumentations && \
     pip uninstall -y opencv-python opencv-python-headless && \
     pip install opencv-python==4.5.4.60"

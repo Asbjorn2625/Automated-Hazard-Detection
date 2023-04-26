@@ -9,9 +9,12 @@ images/*/
 *.pyc
 
 #Ignoring the images
-*.png
-*.jpg
-*.raw
+**.png
+**.jpg
+**.raw
+# Ignore the craft output
+**/cuda0/
 
 # Ignore the idea map from pycharm
 *.idea
+*.vscode

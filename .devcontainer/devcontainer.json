@@ -1,23 +1,25 @@
 {
-    "name": "Python OpenCV",
-    "build": {
-      "dockerfile": "../Dockerfile"
-    },
-    "runArgs": [
-      "--gpus=all",
-      "--network=host",
-      "-e", "DISPLAY=host.docker.internal:0.0",
-      "--shm-size=4g", 
-      "--ipc=host"
-    ],
-    "settings": {
-      "terminal.integrated.defaultProfile.linux": "/bin/bash"
-    },
-    "extensions": [
-      "ms-python.python",
-      "formulahendry.code-runner",
-      "kevinrose.vsc-python-indent",
-      "github.copilot",
-      "ms-azuretools.vscode-docker"
-    ]
+  "name": "Python OpenCV",
+  "build": {
+    "dockerfile": "../Dockerfile"
+  },
+  "runArgs": [
+    "--cap-add=SYS_PTRACE",
+    "--security-opt",
+    "seccomp=unconfined",
+    "--gpus=all",
+    "--network=host",
+    "-e", "DISPLAY=host.docker.internal:0.0"
+  ],
+  "settings": {
+    "terminal.integrated.defaultProfile.linux": "/bin/bash"
+  },
+  "extensions": [
+    "ms-python.python",
+    "formulahendry.code-runner",
+    "kevinrose.vsc-python-indent",
+    "github.copilot",
+    "ms-azuretools.vscode-docker"
+  ],
+  "forwardPorts": []
 }
