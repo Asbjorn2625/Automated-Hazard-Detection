@@ -38,17 +38,20 @@ RUN conda update conda -y && \
 RUN apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the requirements file and the rest of the project
-COPY . .
+# Copy the heavy dependencies file and install them
+COPY requirements-heavy.txt .
+RUN /bin/bash -c "source activate myenv && \
+    pip install -r requirements-heavy.txt -f https://download.pytorch.org/whl/cu118/torch_stable.html"
 
-# Install pip dependencies
+# Copy the requirements file and install other dependencies
+COPY requirements.txt .
 RUN /bin/bash -c "source activate myenv && \
     pip install --no-cache-dir -r requirements.txt && \
-    pip install torch==1.13.1 -f https://download.pytorch.org/whl/cu118/torch_stable.html && \
-    pip install torchvision==0.14.1 torchaudio==0.13.1 && \
-    pip install albumentations && \
     pip uninstall -y opencv-python opencv-python-headless && \
     pip install opencv-python==4.5.4.60"
+
+# Copy the rest of the project
+COPY . .
 
 # Set the DISPLAY environment variable to use the host's X server for GUI applications
 ENV DISPLAY=host.docker.internal:0.0

@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import os
-from sklearn.cluster import DBSCAN
+import open3d as o3d
 
 # Function to get the current real world pixel size
 def get_pixelsize(depth):
@@ -22,53 +22,32 @@ def display_depth(depth, image_name, procent):
     depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth, alpha=0.03), cv2.COLORMAP_JET)
     resize_image(depth_colormap, image_name, procent)
 
-def extract_planes_from_gradients(depth_image, min_distance=50, max_distance=1000, eps=0.1, min_samples=10):
-    # Compute the gradients in the x and y directions
-    grad_x = cv2.Sobel(depth_image, cv2.CV_64F, 1, 0, ksize=5)
-    grad_y = cv2.Sobel(depth_image, cv2.CV_64F, 0, 1, ksize=5)
 
-    # Normalize the gradients to the range [0, 1]
-    grad_x = cv2.normalize(grad_x, None, 0, 1, cv2.NORM_MINMAX)
-    grad_y = cv2.normalize(grad_y, None, 0, 1, cv2.NORM_MINMAX)
+def depth_image_to_point_cloud(depth_image, camera_intrinsics):
+    """Convert a depth image to a point cloud."""
+    height, width = depth_image.shape
 
-    # Combine the gradients and depth image into a single array
-    gradients = np.dstack((grad_x, grad_y, depth_image / max_distance))
+    fx = camera_intrinsics[0, 0]
+    fy = camera_intrinsics[1, 1]
+    cx = camera_intrinsics[0, 2]
+    cy = camera_intrinsics[1, 2]
 
-    # Reshape the gradients array for clustering
-    gradients = gradients.reshape((-1, 3))
+    xx, yy = np.meshgrid(np.arange(width), np.arange(height))
+    xx = (xx - cx) * depth_image / fx
+    yy = (yy - cy) * depth_image / fy
 
-    # Apply DBSCAN clustering to group pixels with similar gradients
-    clustering = DBSCAN(eps=eps, min_samples=min_samples).fit(gradients)
+    points = np.column_stack((xx.ravel(), yy.ravel(), depth_image.ravel())) / 1000  # Convert to meters
+    point_cloud = o3d.geometry.PointCloud()
+    point_cloud.points = o3d.utility.Vector3dVector(points)
+    
+    return point_cloud
 
-    # Get the unique cluster labels and remove the noise cluster (-1)
-    unique_labels = np.unique(clustering.labels_)
-    unique_labels = unique_labels[unique_labels != -1]
 
-    # Extract the planes from the clusters
-    planes = []
-    for label in unique_labels:
-        # Get the indices of the pixels in the current cluster
-        indices = np.argwhere(clustering.labels_ == label)
-
-        # Convert the indices back to the original image coordinates
-        coordinates = np.column_stack((indices % depth_image.shape[1], indices // depth_image.shape[1]))
-
-        # Create a mask for the current cluster
-        mask = np.zeros_like(depth_image, dtype=np.uint8)
-        mask[tuple(coordinates.T)] = 255
-
-        # Find contours in the mask
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        # Find the minimum bounding rectangle for each contour
-        for contour in contours:
-            rect = cv2.minAreaRect(contour)
-            box = cv2.boxPoints(rect)
-            box = np.int0(box)
-            planes.append(box)
-
-    return planes
-
+def resize_depth_image(depth_image, scale):
+    height, width = depth_image.shape
+    new_height, new_width = int(height * scale), int(width * scale)
+    resized_image = cv2.resize(depth_image, (new_width, new_height), interpolation=cv2.INTER_AREA)
+    return resized_image
 
 def display_results(rgb_image, planes):
     # Create a copy of the image to draw on
@@ -79,11 +58,18 @@ def display_results(rgb_image, planes):
         cv2.drawContours(image_with_planes, [plane], 0, (0, 255, 0), 2)
 
     # Display the image with the extracted planes
-    resize_image(image_with_planes, "image_with_planes", 0.5)
+    cv2.imshow("image_with_planes", image_with_planes)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
 
+def project_points_to_image(points, camera_intrinsics):
+     # Filter out points with a z-coordinate close to zero.
+    valid_points = points[np.abs(points[:, 2]) > 1e-6]
+    
+    # Project the valid points onto the image plane.
+    uv = (valid_points @ camera_intrinsics.T)[:, :2] / valid_points[:, 2, np.newaxis]
+    return uv.round().astype(int)
 
 # Create list of image filenames
 rgb_images = [f'./testing/early_test_images/{img}' for img in os.listdir("./testing/early_test_images") if img.startswith("rgb_image")]
@@ -92,8 +78,6 @@ rgb_images = [f'./testing/early_test_images/{img}' for img in os.listdir("./test
 with np.load("src/Data acquisition/calibration.npz") as a:
     mtx = a["mtx"]
     dist = a["dist"]
-
-
 
 
 # Loop through the images
@@ -105,7 +89,66 @@ for image in rgb_images:
     # Undistort an image
     img_undistorted = cv2.undistort(img, mtx, dist)
     depth_undistorted = cv2.undistort(depth, mtx, dist)
-
-    planes = extract_planes_from_gradients(depth_undistorted)
     
-    display_results(img_undistorted, planes)
+    # Remove background - Set pixels below the threshold as black
+    grey_color = 50
+    depth_undistorted[np.where((depth_undistorted > 1000) | (depth_undistorted < 10))] = grey_color
+    
+    # Resize the images to speed up processing
+    #scale = 0.5
+    #img_undistorted_resized = resize_image(img_undistorted, scale)
+    #depth_undistorted_resized = resize_image(depth_undistorted, scale)
+
+    # Update the camera intrinsics matrix based on the scaling factor
+    #scaled_mtx = mtx.copy()
+    #scaled_mtx[:2, :2] *= scale  # Scale the focal length and principal point
+    
+    segmented_rgb_image = img_undistorted.copy()
+    # Convert the depth image to a point cloud.
+    point_cloud = depth_image_to_point_cloud(depth_undistorted, mtx)
+
+    max_planes = 5
+    plane_colors = [
+        (0, 100, 0),    # Green
+        (0, 0, 255),    # Blue
+        (255, 0, 0),    # Red
+        (255, 255, 0),  # Yellow
+        (255, 0, 255),  # Magenta
+    ]
+
+    for i in range(max_planes):
+        # Apply RANSAC to segment planes from the point cloud.
+        plane_model, inliers = point_cloud.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=1000)
+        
+        if len(inliers) == 0:
+            break  # No more planes found
+
+        # Extract the plane points and remove them from the point cloud.
+        plane_points = point_cloud.select_by_index(inliers)
+        point_cloud = point_cloud.select_by_index(inliers, invert=True)
+        
+        # Remove points with low depth values (e.g., less than 0.1 meters)
+        mask = np.asarray(point_cloud.points)[:, 2] > 0.1
+        point_cloud = point_cloud.select_by_index(np.where(mask)[0])
+
+        # Project the plane points back onto the image plane.
+        plane_points_image = project_points_to_image(np.asarray(plane_points.points), mtx)
+
+        # Filter out points with coordinates outside the image bounds.
+        valid_indices = np.where((plane_points_image[:, 0] >= 0) & (plane_points_image[:, 0] < segmented_rgb_image.shape[0]) &
+                                (plane_points_image[:, 1] >= 0) & (plane_points_image[:, 1] < segmented_rgb_image.shape[1]))[0]
+        valid_points_image = plane_points_image[valid_indices]
+
+        # Transpose the image before applying the mask
+        segmented_rgb_image = np.transpose(segmented_rgb_image, (1, 0, 2))
+
+        # Assign a unique color to the plane points on the RGB image
+        segmented_rgb_image[valid_points_image[:, 0], valid_points_image[:, 1]] = plane_colors[i % len(plane_colors)]
+
+        # Transpose the image back after applying the mask
+        segmented_rgb_image = np.transpose(segmented_rgb_image, (1, 0, 2))
+
+    # Show the original RGB image and the segmented RGB image.
+    resize_image(segmented_rgb_image,"image", 0.5)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
