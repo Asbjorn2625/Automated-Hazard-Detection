@@ -42,13 +42,31 @@ def depth_image_to_point_cloud(depth_image, camera_intrinsics):
     
     return point_cloud
 
-def rotation_matrix(axis, angle):
-    axis = axis / np.linalg.norm(axis)
-    a = np.cos(angle / 2)
-    b, c, d = -axis * np.sin(angle / 2)
-    return np.array([[a * a + b * b - c * c - d * d, 2 * (b * c - a * d), 2 * (b * d + a * c)],
-                     [2 * (b * c + a * d), a * a + c * c - b * b - d * d, 2 * (c * d - a * b)],
-                     [2 * (b * d - a * c), 2 * (c * d + a * b), a * a + d * d - b * b - c * c]])
+def project_points_onto_plane(points, plane_model):
+    plane_normal = np.array(plane_model[:3])
+    plane_point = plane_normal * plane_model[3]
+    projection_matrix = np.eye(3) - np.outer(plane_normal, plane_normal)
+
+    projected_points = np.dot(points, projection_matrix.T) + plane_point
+    return projected_points
+
+def transform_rgb_image_to_plane_view(rgb_image, plane_points, output_size=(400, 400)):
+    # Define the destination points for the transformation (rectangle)
+    destination_points = np.array([
+        [0, 0],
+        [output_size[0] - 1, 0],
+        [output_size[0] - 1, output_size[1] - 1],
+        [0, output_size[1] - 1]
+    ], dtype=np.float32)
+
+    # Compute the homography matrix
+    homography_matrix, _ = cv2.findHomography(plane_points, destination_points)
+
+    # Warp the RGB image using the computed homography matrix
+    transformed_image = cv2.warpPerspective(rgb_image, homography_matrix, output_size)
+
+    return transformed_image
+
 
 def resize_depth_image(depth_image, scale):
     height, width = depth_image.shape
@@ -78,11 +96,22 @@ def project_points_to_image(points, camera_intrinsics):
     uv = (valid_points @ camera_intrinsics.T)[:, :2] / valid_points[:, 2, np.newaxis]
     return uv.round().astype(int)
 
-def image_from_points(points, intrinsic_matrix):
-    points_homogeneous = np.hstack([points, np.ones((points.shape[0], 1))])
-    projected_points_homogeneous = np.dot(points_homogeneous, intrinsic_matrix.T)
-    projected_points = projected_points_homogeneous[:, :2] / projected_points_homogeneous[:, 2:3]
-    return projected_points
+def transform_rgb_image_to_plane_view(rgb_image, plane_points, output_size=(400, 400)):
+    # Define the destination points for the transformation (rectangle)
+    destination_points = np.array([
+        [0, 0],
+        [output_size[0] - 1, 0],
+        [output_size[0] - 1, output_size[1] - 1],
+        [0, output_size[1] - 1]
+    ], dtype=np.float32)
+
+    # Compute the homography matrix
+    homography_matrix, _ = cv2.findHomography(plane_points, destination_points)
+
+    # Warp the RGB image using the computed homography matrix
+    transformed_image = cv2.warpPerspective(rgb_image, homography_matrix, output_size)
+
+    return transformed_image
 
 
 # Create list of image filenames
@@ -154,12 +183,13 @@ for image in rgb_images:
         angle_diff = abs(angle_x)
         if angle_diff < min_angle_diff:
             min_angle_diff = angle_diff
-            best_plane_inliers = inliers
-            best_plane_normal_vector = normal_vector
+            # Extract the plane points and remove them from the point cloud.
+            best_plane_inliers = point_cloud.select_by_index(inliers)
+            best_plane_normal_vector = point_cloud.select_by_index(inliers, invert=True)
     
-    # Extract the plane points and remove them from the point cloud.
-    plane_points = point_cloud.select_by_index(best_plane_inliers)
-    point_cloud = point_cloud.select_by_index(best_plane_inliers, invert=True)
+   
+    plane_points = best_plane_inliers
+    point_cloud = best_plane_normal_vector
     
     # Remove points with low depth values (e.g., less than 0.1 meters)
     mask = np.asarray(point_cloud.points)[:, 2] > 0.1
@@ -175,14 +205,38 @@ for image in rgb_images:
 
     # Assign a unique color to the plane points on the RGB image
     segmented_rgb_image[valid_points_image[:, 1].round().astype(int), valid_points_image[:, 0].round().astype(int)] = plane_colors[i % len(plane_colors)]
+
+    # Create binary mask
+    plane_mask = np.zeros_like(segmented_rgb_image)
+    plane_mask[valid_points_image[:, 1].round().astype(int), valid_points_image[:, 0].round().astype(int)] = 255
+    # Remove noise
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9,9))
+    eroded = cv2.erode(cv2.cvtColor(plane_mask, cv2.COLOR_RGB2GRAY), kernel, iterations=1)
+    dilated = cv2.dilate(eroded, kernel, iterations=3)
+    # Get the convex hull
+    contours, _ = cv2.findContours(dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    hull_list = []
+    for i in range(len(contours)):
+        if len(contours[i]) > 200:
+            hull = cv2.convexHull(contours[i])
+            hull_list.append(hull)
+    # Approximate the convex hull with a polygonal curve
+    epsilon = 0.1 * cv2.arcLength(hull, True)
+    corners = cv2.approxPolyDP(hull, epsilon, True)
     
+    for corner in corners:
+        cv2.circle(plane_mask, tuple(corner[0]), 5, (0, 0, 255), -1)
+    
+    cv2.drawContours(plane_mask, hull_list, -1, [255,0,0], thickness=2)
+    output_image = transform_rgb_image_to_plane_view(img_undistorted, corners)      
     # Rotate the image 90 degress
+    plane_mask = cv2.rotate(plane_mask, cv2.ROTATE_90_CLOCKWISE)
     segmented_rgb_image = cv2.rotate(segmented_rgb_image, cv2.ROTATE_90_CLOCKWISE)
-
-    # Transform the plane to look directly at the camera
-
-
+    output_image = cv2.rotate(output_image, cv2.ROTATE_90_CLOCKWISE)
+    
     # Show the original RGB image and the segmented RGB image.
+    resize_image(plane_mask,"mask", 0.5)
     resize_image(segmented_rgb_image,"image", 0.5)
+    resize_image(output_image,"output", 0.5)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
