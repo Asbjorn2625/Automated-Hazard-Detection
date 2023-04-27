@@ -42,6 +42,13 @@ def depth_image_to_point_cloud(depth_image, camera_intrinsics):
     
     return point_cloud
 
+def rotation_matrix(axis, angle):
+    axis = axis / np.linalg.norm(axis)
+    a = np.cos(angle / 2)
+    b, c, d = -axis * np.sin(angle / 2)
+    return np.array([[a * a + b * b - c * c - d * d, 2 * (b * c - a * d), 2 * (b * d + a * c)],
+                     [2 * (b * c + a * d), a * a + c * c - b * b - d * d, 2 * (c * d - a * b)],
+                     [2 * (b * d - a * c), 2 * (c * d + a * b), a * a + d * d - b * b - c * c]])
 
 def resize_depth_image(depth_image, scale):
     height, width = depth_image.shape
@@ -71,8 +78,15 @@ def project_points_to_image(points, camera_intrinsics):
     uv = (valid_points @ camera_intrinsics.T)[:, :2] / valid_points[:, 2, np.newaxis]
     return uv.round().astype(int)
 
+def image_from_points(points, intrinsic_matrix):
+    points_homogeneous = np.hstack([points, np.ones((points.shape[0], 1))])
+    projected_points_homogeneous = np.dot(points_homogeneous, intrinsic_matrix.T)
+    projected_points = projected_points_homogeneous[:, :2] / projected_points_homogeneous[:, 2:3]
+    return projected_points
+
+
 # Create list of image filenames
-rgb_images = [f'./testing/early_test_images/{img}' for img in os.listdir("./testing/early_test_images") if img.startswith("rgb_image")]
+rgb_images = [f'./testing/first data set/{img}' for img in os.listdir("./testing/first data set") if img.startswith("rgb_image")]
 
 # Load the intrinsics
 with np.load("src/Data acquisition/calibration.npz") as a:
@@ -91,7 +105,7 @@ for image in rgb_images:
     depth_undistorted = cv2.undistort(depth, mtx, dist)
     
     # Remove background - Set pixels below the threshold as black
-    grey_color = 50
+    grey_color = 0
     depth_undistorted[np.where((depth_undistorted > 1000) | (depth_undistorted < 10))] = grey_color
     
     # Resize the images to speed up processing
@@ -115,38 +129,58 @@ for image in rgb_images:
         (255, 255, 0),  # Yellow
         (255, 0, 255),  # Magenta
     ]
-
+    
+    min_angle_diff = float("inf")
+    best_plane_inliers = None
+    best_plane_normal_vector = None
     for i in range(max_planes):
         # Apply RANSAC to segment planes from the point cloud.
         plane_model, inliers = point_cloud.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=1000)
+
+         # Calculate the normalized normal vector
+        normal_vector = plane_model[:3] / np.linalg.norm(plane_model[:3])
+        # Calculate the angle between the normal vector and the vertical direction (in degrees)
+        angle_y = np.degrees(np.arccos(np.dot(normal_vector, np.array([1, 0, 0])))) # Our camera is turned, so the floor is on the horizontal
+        angle_x = np.degrees(np.arccos(np.dot(normal_vector, np.array([0, 0, 1])))) # the closer to zero the closer to being orthogonal to the cameras optical axis
         
+        # Remove the floor and noisy data
+        if angle_y < 35 or len(inliers) < 80000:
+            # Extract the plane points and remove them from the point cloud.
+            plane_points = point_cloud.select_by_index(inliers)
+            point_cloud = point_cloud.select_by_index(inliers, invert=True)
+            continue
         if len(inliers) == 0:
             break  # No more planes found
+        angle_diff = abs(angle_x)
+        if angle_diff < min_angle_diff:
+            min_angle_diff = angle_diff
+            best_plane_inliers = inliers
+            best_plane_normal_vector = normal_vector
+    
+    # Extract the plane points and remove them from the point cloud.
+    plane_points = point_cloud.select_by_index(best_plane_inliers)
+    point_cloud = point_cloud.select_by_index(best_plane_inliers, invert=True)
+    
+    # Remove points with low depth values (e.g., less than 0.1 meters)
+    mask = np.asarray(point_cloud.points)[:, 2] > 0.1
+    point_cloud = point_cloud.select_by_index(np.where(mask)[0])
 
-        # Extract the plane points and remove them from the point cloud.
-        plane_points = point_cloud.select_by_index(inliers)
-        point_cloud = point_cloud.select_by_index(inliers, invert=True)
-        
-        # Remove points with low depth values (e.g., less than 0.1 meters)
-        mask = np.asarray(point_cloud.points)[:, 2] > 0.1
-        point_cloud = point_cloud.select_by_index(np.where(mask)[0])
+    # Project the plane points back onto the image plane.
+    plane_points_image = project_points_to_image(np.asarray(plane_points.points), mtx)
 
-        # Project the plane points back onto the image plane.
-        plane_points_image = project_points_to_image(np.asarray(plane_points.points), mtx)
+    # Filter out points with coordinates outside the image bounds.
+    valid_indices = np.where((plane_points_image[:, 0] >= 0) & (plane_points_image[:, 0] < segmented_rgb_image.shape[1]) &
+                        (plane_points_image[:, 1] >= 0) & (plane_points_image[:, 1] < segmented_rgb_image.shape[0]))[0]
+    valid_points_image = plane_points_image[valid_indices]
 
-        # Filter out points with coordinates outside the image bounds.
-        valid_indices = np.where((plane_points_image[:, 0] >= 0) & (plane_points_image[:, 0] < segmented_rgb_image.shape[0]) &
-                                (plane_points_image[:, 1] >= 0) & (plane_points_image[:, 1] < segmented_rgb_image.shape[1]))[0]
-        valid_points_image = plane_points_image[valid_indices]
+    # Assign a unique color to the plane points on the RGB image
+    segmented_rgb_image[valid_points_image[:, 1].round().astype(int), valid_points_image[:, 0].round().astype(int)] = plane_colors[i % len(plane_colors)]
+    
+    # Rotate the image 90 degress
+    segmented_rgb_image = cv2.rotate(segmented_rgb_image, cv2.ROTATE_90_CLOCKWISE)
 
-        # Transpose the image before applying the mask
-        segmented_rgb_image = np.transpose(segmented_rgb_image, (1, 0, 2))
+    # Transform the plane to look directly at the camera
 
-        # Assign a unique color to the plane points on the RGB image
-        segmented_rgb_image[valid_points_image[:, 0], valid_points_image[:, 1]] = plane_colors[i % len(plane_colors)]
-
-        # Transpose the image back after applying the mask
-        segmented_rgb_image = np.transpose(segmented_rgb_image, (1, 0, 2))
 
     # Show the original RGB image and the segmented RGB image.
     resize_image(segmented_rgb_image,"image", 0.5)
