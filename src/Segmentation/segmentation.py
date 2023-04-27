@@ -46,6 +46,7 @@ class Segmentation:
             self.Lithiummodel = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.DEVICE)
             self.Lithiummodel.load_state_dict(torch.load("Models/TrainingModelLithium.pth")["state_dict"])
             self.Lithiummodel.eval()
+            print("Models loaded")
             
             
     def _image_segment(self,model,image_np, out_x=1920, out_y=1080):
@@ -53,7 +54,7 @@ class Segmentation:
         # Ensure the input is a NumPy array with the correct data type
         assert isinstance(image_np, np.ndarray), "Input must be a numpy.ndarray"
         assert image_np.dtype == np.uint8, "Input array must have dtype 'uint8'"
-        assert model != None, "Model not loaded, or mispell of the modeltype"
+        assert model != None, "Model not loaded"
         transform = T.Compose([
             T.Resize((562, 562), antialias=True),
             T.ToTensor(),
@@ -68,7 +69,7 @@ class Segmentation:
         x = x.unsqueeze(0).to(device=self.DEVICE)
         # Perform a forward pass and create a binary segmentation mask
         with torch.no_grad():
-            preds = torch.sigmoid(model)
+            preds = torch.sigmoid(model(x))
             preds = (preds > 0.5).float()
         preds = preds.cpu().numpy()
         if preds.shape[0] == 1:
