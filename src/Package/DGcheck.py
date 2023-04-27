@@ -3,7 +3,7 @@ from src.Hazard_labels.hazard import Hazard_labels
 from src.UN_labels.UN import UN
 
 class Package():
-    def __init__(self) -> None:
+    def __init__(self):
         pass
     def main():
         pass

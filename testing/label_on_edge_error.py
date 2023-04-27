@@ -26,8 +26,6 @@ def compare_to_original_image(img_gray):
 
 
 def labels_on_edge(cnt):
-
-
         # draw the contour on the original grayscale image
         cv2.drawContours(color, [cnt], 0, (0, 255, 0), 3)
         moments = cv2.moments(cnt)
@@ -60,13 +58,12 @@ def labels_on_edge(cnt):
         #cv2.imshow("label on edge", color )   
         
 
-        return  label_bent, distance
+        return  label_bent
 
         
         
     
 def label_oriention(cnt):
-    
    # Compute the centroid of the contour
     M = cv2.moments(cnt)
     cx = int(M['m10'] / M['m00'])
