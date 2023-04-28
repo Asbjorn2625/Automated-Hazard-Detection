@@ -57,6 +57,9 @@ class ReadText:
         ymax = min(h, ymax)
         
         cropped_image = image[ymin:ymax, xmin:xmax]
+        
+        if ymax - ymin > xmax - xmin:
+            cv2.rotate(cropped_image, cv2.ROTATE_90_CLOCKWISE)
 
         # Convert to grayscale
         if len(image > 2):

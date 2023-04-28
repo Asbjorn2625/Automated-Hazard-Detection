@@ -1,35 +1,11 @@
 import cv2
 import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter
-import tensorflow as tf
-import tensorflow_hub as hub
 
 
 class PreProcess:
-    def __init__(self, fetched_images):
-        self.image_fetcher = fetched_images
-        self.counter = 0
-        self.model = None
-        self.esrgn_path = "https://tfhub.dev/captain-pool/esrgan-tf2/1"
-
-    def load_model(self):
-        if self.counter == 0:
-            self.model = hub.load(self.esrgn_path)
-            self.counter += 1
-
-
-    def preprocessing(self, img):
-        imageSize = (tf.convert_to_tensor(img.shape[:-1]) // 4) * 4
-        cropped_image = tf.image.crop_to_bounding_box(img, 0, 0, imageSize[0], imageSize[1])
-        preprocessed_image = tf.cast(cropped_image, tf.float32)
-        return tf.expand_dims(preprocessed_image, 0)
-
-
-    def srmodel(self, img):
-        self.load_model()
-        preprocessed_image = self.preprocessing(img)
-        new_image = self.model(preprocessed_image)
-        return tf.squeeze(new_image) / 255.0
+    def __init__(self):
+        pass
 
     def image_enhancer(self, image):
         # Convert numpy.ndarray to PIL Image
@@ -69,7 +45,4 @@ class PreProcess:
                 # Apply image enhancement
                 enhanced_image = self.image_enhancer(diamond)
                 # Apply super resolution
-                sr_image = self.srmodel(enhanced_image)
-                sr_image = tf.squeeze(sr_image).numpy() * 255.0  # convert to numpy array and scale pixel values back to [0, 255]
-                sr_image = np.clip(sr_image, 0, 255).astype(np.uint8)  # clip pixel values to [0, 255] and convert to uint8 data type
-                yield sr_image, name
+                yield enhanced_image, name
