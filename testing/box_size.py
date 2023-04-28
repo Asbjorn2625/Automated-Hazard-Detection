@@ -50,23 +50,6 @@ def project_points_onto_plane(points, plane_model):
     projected_points = np.dot(points, projection_matrix.T) + plane_point
     return projected_points
 
-def transform_rgb_image_to_plane_view(rgb_image, plane_points, output_size=(400, 400)):
-    # Define the destination points for the transformation (rectangle)
-    destination_points = np.array([
-        [0, 0],
-        [output_size[0] - 1, 0],
-        [output_size[0] - 1, output_size[1] - 1],
-        [0, output_size[1] - 1]
-    ], dtype=np.float32)
-
-    # Compute the homography matrix
-    homography_matrix, _ = cv2.findHomography(plane_points, destination_points)
-
-    # Warp the RGB image using the computed homography matrix
-    transformed_image = cv2.warpPerspective(rgb_image, homography_matrix, output_size)
-
-    return transformed_image
-
 
 def resize_depth_image(depth_image, scale):
     height, width = depth_image.shape
@@ -212,7 +195,7 @@ for image in rgb_images:
     # Remove noise
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9,9))
     eroded = cv2.erode(cv2.cvtColor(plane_mask, cv2.COLOR_RGB2GRAY), kernel, iterations=1)
-    dilated = cv2.dilate(eroded, kernel, iterations=3)
+    dilated = cv2.dilate(eroded, kernel, iterations=5)
     # Get the convex hull
     contours, _ = cv2.findContours(dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     hull_list = []
