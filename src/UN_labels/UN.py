@@ -16,7 +16,8 @@ class UNLabels:
       self.list = []
 
     def unLogo(self, image):
-        cv2.imshow
+        cv2.imshow(image)
+        cv2.waitKey(0)
     def packagingCodes(self,image):
         import re
         pattern = r"^\d+\w+\/\w+\d(\.\d)*\/(\w)?"
@@ -51,9 +52,10 @@ for filename, (rgb_img, depth_img) in img_lib.items():
         for bounds in tran_img:
             cropped = segs_image[bounds[1]:bounds[3], bounds[0]:bounds[2]]
             enhance = PreProcesser.image_enhancer(cropped)
-            mask = np.where((depth_img > 1000) | (depth_img < 10), 0, 255).astype(np.uint8)
-            masked = cv2.bitwise_and(rgb_img, rgb_img, mask=mask)
-            UNinv= cv2.bitwise_not(segs_image)
-            masked = cv2.bitwise_and(masked, UNinv)
-            print("Text found" + str(UN.packagingCodes(masked)))
-
+            logo= UN.unLogo(cropped)
+            
+        mask = np.where((depth_img > 1000) | (depth_img < 10), 0, 255).astype(np.uint8)
+        masked = cv2.bitwise_and(rgb_img, rgb_img, mask=mask)
+        UNinv= cv2.bitwise_not(segs_image)
+        masked = cv2.bitwise_and(masked, UNinv)
+        print("Text found" + str(UN.packagingCodes(masked)))
