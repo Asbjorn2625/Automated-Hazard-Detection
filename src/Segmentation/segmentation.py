@@ -11,7 +11,7 @@ from Initial_unet.utils.model import UNET
 
 class Segmentation:
     def __init__(self):
-        self.DEVICE = "cuda"
+        self.DEVICE = "cuda" if torch.cuda.is_available else "cpu"
         self.Hazardmodel= None
         self.UNmodel= None
         self.CAOmodel= None

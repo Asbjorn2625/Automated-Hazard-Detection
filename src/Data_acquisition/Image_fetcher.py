@@ -12,6 +12,10 @@ class ImageFetcher:
         self._fetch_depth()
 
     def _fetch_RGB(self):
+        """
+        Fetches all RGB images from the dataset folder
+        :return: None
+        """
         for root, dirs, files in os.walk(self.path):
             for file in files:
                 if file.endswith(".png"):
@@ -35,6 +39,7 @@ class ImageFetcher:
                     mask = cv2.dilate(mask, kernel, iterations=2)
                     self.depthImages.append((raw_path, depth_image, mask))
     def get_images(self):
+        """Get depth images """
         images = []
         for i in tqdm(self.RGBimages):
             file_nr1=i[0].replace(".png","").replace("Dataset/","").split("_")[2]
