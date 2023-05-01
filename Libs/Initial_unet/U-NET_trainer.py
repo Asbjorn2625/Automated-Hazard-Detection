@@ -1,5 +1,6 @@
 import os
 import cv2
+import matplotlib.pyplot as plt
 import torch
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -20,31 +21,41 @@ from utils.utils import (
 from utils.Dice import DiceLoss
 from sklearn.model_selection import train_test_split
 
-import sys
-sys.path.append('/workspaces/P6-Automated-Hazard-Detection')
-from Libs.functions.Merge_anntotes import Merge
-
-
 class UNETTrainer:
-    def __init__(self, rgb_folder, mask_folder, image_size=[1920,1080], batch_size=1, epochs=70, learning_rate=1e-4):
-        # Fix the folder for the UNET
-        
+    def __init__(self, base_folder, rgb_folder, mask_folder, image_size=[1920,1080], batch_size=1, epochs=70, learning_rate=1e-5, worker_threads = 2, NEW_SET=True, DEBUG_PLOT = False):
+        if NEW_SET:
+            # Fix the folder for the UNET
+            rgb_list = [f'{img}' for img in os.listdir(rgb_folder) if img.startswith("rgb_image")]
+            depth_list = [path.replace("rgb_image", "depth_image").replace("png", "raw") for path in rgb_list]
+            mask_list = [f'{img}' for img in os.listdir(mask_folder)]
+
+            mask_list = self._merge_masks(mask_folder, mask_list)
+            rgb_list = self._onlyTruths(rgb_list, mask_list)
+            train_folders, test_folders = self._split_images(base_folder, rgb_folder, mask_folder, rgb_list, mask_list)
+        else:
+            train_folders = [os.path.join(base_folder, "train_mask"), os.path.join(base_folder, "train_rgb")]
+            test_folders = [os.path.join(base_folder, "test_mask"), os.path.join(base_folder, "test_rgb")]
+
+        if DEBUG_PLOT:
+            visualize_samples(train_folders[1], train_folders[0])
+    
+        os.makedirs(os.path.join(base_folder, "Images"),exist_ok=True)
         self.config = {
                 "learning_rate": learning_rate,
                 "device": "cuda",
                 "batch_size": batch_size,
                 "num_epochs": epochs,
-                "num_workers": 4,
+                "num_workers": worker_threads,
                 "image_height": int(image_size[0]),
                 "image_width": int(image_size[1]),
                 "pin_memory": True,
                 "load_model": False,
-                "train_img_dir": rgb_folder,
-                "train_mask_dir": mask_folder,
-                "val_img_dir": rgb_folder,
-                "val_mask_dir": mask_folder,
-                "model_name": os.getcwd().replace("\\", "/") + "UNmodel.pth",
-                "save_folder": os.getcwd().replace("\\", "/") + "/Initial_unet/Training/Images",
+                "train_img_dir": train_folders[1],
+                "train_mask_dir": train_folders[0],
+                "val_img_dir": test_folders[1],
+                "val_mask_dir": test_folders[0],
+                "model_name": os.path.join(base_folder, "UNmodel.pth"),
+                "save_folder": os.path.join(base_folder, "Images"),
                 "train_transform": A.Compose(
                     [
                         A.Resize(height=image_size[0], width=image_size[1]),
@@ -53,8 +64,9 @@ class UNETTrainer:
                         A.VerticalFlip(p=0.1),
                         A.RandomBrightnessContrast(p=0.3),
                         A.Normalize(
-                            mean=[0.0, 0.0, 0.0],
-                            std=[1.0, 1.0, 1.0],
+                            # ImageNet std values
+                            mean=[0.485, 0.456, 0.406],
+                            std=[0.229, 0.224, 0.225],
                             max_pixel_value=255.0,
                         ),
                         ToTensorV2(),
@@ -64,8 +76,9 @@ class UNETTrainer:
                     [
                         A.Resize(height=image_size[0], width=image_size[1]),
                         A.Normalize(
-                            mean=[0.0, 0.0, 0.0],
-                            std=[1.0, 1.0, 1.0],
+                            # ImageNet std values
+                            mean=[0.485, 0.456, 0.406],
+                            std=[0.229, 0.224, 0.225],
                             max_pixel_value=255.0,
                         ),
                         ToTensorV2(),
@@ -96,13 +109,17 @@ class UNETTrainer:
         for batch_idx, (data, targets) in enumerate(loop):
             data = data.to(device=self.config["device"])
             targets = targets.float().unsqueeze(1).to(device=self.config["device"])
-
+            
             with torch.cuda.amp.autocast():
                 predictions = self.model(data)
                 loss = self.loss_fn(predictions, targets)
 
             self.optimizer.zero_grad()
             self.scaler.scale(loss).backward()
+            
+            # Add gradient clipping
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            
             self.scaler.step(self.optimizer)
             self.scaler.update()
 
@@ -147,87 +164,97 @@ class UNETTrainer:
             self.tb.add_scalar('Loss', loss / len(self.train_loader), epoch)
             self.tb.add_scalar('F1-score', F1, epoch)
             self.tb.add_scalar('IoU', IoU, epoch)
-            self.tb.close()
+        self.tb.close()
     
-    def _merge_masks(self, folder):
-        # use os library to search for all files in a masks directory
-        Mask_cwd = os.path.join(os.getcwd(), folder)
-        file_list = os.listdir(Mask_cwd)
-
+    def _merge_masks(self, mask_folder, mask_list):
         # start finding duplicates
-        for i, image1 in enumerate(file_list):
+        for i, image1 in enumerate(mask_list):
             imag1_split = image1.split("_")
-            for j, image2 in enumerate(file_list):
+            for j, image2 in enumerate(mask_list):
                 imag2_split = image2.split("_")
-                if i != j and imag1_split[2] == imag2_split[2]:
-                    print("found duplicate")
-                    if imag1_split[3] != imag2_split[3]:
-                        img1 = cv2.imread(os.path.join(Mask_cwd, image1))
-                        img2 = cv2.imread(os.path.join(Mask_cwd, image2))
+                if i != j and imag1_split[-2] == imag2_split[-2]:
+                    if imag1_split[-1] != imag2_split[-1]:
+                        img1 = cv2.imread(os.path.join(mask_folder, image1))
+                        img2 = cv2.imread(os.path.join(mask_folder, image2))
                         img1 = cv2.add(img1, img2)
-                        cv2.imwrite(os.path.join(Mask_cwd, image1), img1)
-                        os.remove(os.path.join(Mask_cwd, image2))
-                        file_list.pop(j)
-                        print("removed duplicate")
+                        cv2.imwrite(os.path.join(mask_folder, image1), img1)
+                        os.remove(os.path.join(mask_folder, image2))
+                        mask_list.pop(j)
+        return mask_list
     
-    def _split_images(folder, rgb_folder, mask_folder, train_ratio=0.8):
+    def _split_images(self, folder, rgb_folder, mask_folder, rgb_list, mask_list, train_ratio=0.8):
         # Create new folders for train and test data
-        base_path = os.getcwd()
-        train_mask_folder = os.path.join(base_path, folder, "train_mask")
-        train_rgb_folder = os.path.join(base_path, folder, "train_rgb")
-        test_mask_folder = os.path.join(base_path, folder, "test_mask")
-        test_rgb_folder = os.path.join(base_path, folder, "test_rgb")
+        train_mask_folder = os.path.join(folder, "train_mask")
+        train_rgb_folder = os.path.join(folder, "train_rgb")
+        test_mask_folder = os.path.join(folder, "test_mask")
+        test_rgb_folder = os.path.join(folder, "test_rgb")
         os.makedirs(train_mask_folder, exist_ok=True)
         os.makedirs(train_rgb_folder, exist_ok=True)
         os.makedirs(test_mask_folder, exist_ok=True)
         os.makedirs(test_rgb_folder, exist_ok=True)
-        
-        # Get list of mask and RGB images
-        mask_list = os.listdir(mask_folder)
-        rgb_list = os.listdir(rgb_folder)
-        
+ 
         # Split the images randomly into train and test sets
         mask_train, mask_test, rgb_train, rgb_test = train_test_split(mask_list, rgb_list, train_size=train_ratio, random_state=42)
-        
+
         # Move the train images to the train folders and save as PNG
         for mask_file, rgb_file in tqdm(zip(mask_train, rgb_train), desc='Moving train images'):
             mask = cv2.imread(os.path.join(mask_folder, mask_file), cv2.IMREAD_GRAYSCALE)
             rgb = cv2.imread(os.path.join(rgb_folder, rgb_file))
-            cv2.imwrite(os.path.join(train_mask_folder, mask_file), mask)
+
+            cv2.imwrite(os.path.join(train_mask_folder, mask_file[:-10]+".png"), mask)
             cv2.imwrite(os.path.join(train_rgb_folder, rgb_file), rgb)
             
         # Move the test images to the test folders and save as PNG
         for mask_file, rgb_file in tqdm(zip(mask_test, rgb_test), desc='Moving test images'):
             mask = cv2.imread(os.path.join(mask_folder, mask_file), cv2.IMREAD_GRAYSCALE)
             rgb = cv2.imread(os.path.join(rgb_folder, rgb_file))
-            cv2.imwrite(os.path.join(test_mask_folder, mask_file), mask)
+            cv2.imwrite(os.path.join(test_mask_folder, mask_file[:-10]+".png"), mask)
             cv2.imwrite(os.path.join(test_rgb_folder, rgb_file), rgb)
+        return([train_mask_folder, train_rgb_folder], [test_mask_folder, test_rgb_folder])
     
-    def _killTheExtraNumber(self, folder):
-        # use os library to search for all files in a masks directory
-        Mask_cwd = os.path.join(os.getcwd(), folder)
-        file_list = os.listdir(Mask_cwd)
-
-        # start finding duplicates
-        for i, image1 in enumerate(file_list):
-            imag1_split = image1.split("_")
-            new_name=os.path.join(Mask_cwd, "%s_%s_%s.png" % (imag1_split[0], imag1_split[1], imag1_split[2])).replace("\\", "/")
-            os.rename(os.path.join(Mask_cwd, image1).replace("\\", "/"), new_name)
-    
-    def _onlyTruths(self, rgb_folder, mask_folder): 
-        mask_list = os.listdir(mask_folder)
-        rgb_list = os.listdir(rgb_folder)
+    def _onlyTruths(self, rgb_list, mask_list):
+        mask_list = [mask[:-10]+".png" for mask in mask_list]
         mask_set = set(mask_list)
         not_in_mask = [img for img in rgb_list if img not in mask_set]
         for img in not_in_mask:
-            os.remove(os.path.join(rgb_folder, img))
+            rgb_list.remove(img)
+        return rgb_list
+
+
+def visualize_samples(image_folder, mask_folder, num_samples=5):
+    image_files = os.listdir(image_folder)
+    mask_files = os.listdir(mask_folder)
+
+    for i in range(num_samples):
+        image_file = os.path.join(image_folder, image_files[i])
+        mask_file = os.path.join(mask_folder, mask_files[i])
+
+        # Load the images
+        image = cv2.imread(image_file)
+        mask = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE)
+
+        # Convert the image from BGR to RGB
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        # Plot the images side by side
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+        ax1.imshow(image)
+        ax1.set_title("Image")
+        ax1.axis("off")
+
+        ax2.imshow(mask, cmap="gray")
+        ax2.set_title("Mask")
+        ax2.axis("off")
+
+        plt.show()
+
 
 def main():
     base_folder = os.getcwd().replace("\\", "/") + "/Libs/Initial_unet/Training"
-    rgb_folder = os.path.join(base_folder, "train_rgb_depth")
-    mask_folder = os.path.join(base_folder, "train_mask")
+    rgb_folder = os.path.join(base_folder, "original/rgb_depth")
+    mask_folder = os.path.join(base_folder, "original/masks/masks")
     #print(rgb_folder, mask_folder)
-    trainer = UNETTrainer(rgb_folder, mask_folder)
+    trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, NEW_SET=False, DEBUG_PLOT=False)
     trainer.train()
 
 

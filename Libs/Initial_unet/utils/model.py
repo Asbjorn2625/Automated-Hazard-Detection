@@ -76,6 +76,7 @@ def test():
     preds = model(x)
     assert preds.shape == x.shape
     print(type(preds))
+    print(preds)
 
 
 if __name__ == "__main__":

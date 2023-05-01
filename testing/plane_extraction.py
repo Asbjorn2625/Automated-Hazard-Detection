@@ -8,7 +8,7 @@ import cv2
 import random
 
 
-pp = PreProcess(None)
+pp = PreProcess()
 
 # Create list of image filenames
 rgb_images = [f'./testing/first data set/{img}' for img in os.listdir("./testing/first data set") if img.startswith("rgb_image")]
