@@ -2,6 +2,7 @@ import os
 import cv2
 import matplotlib.pyplot as plt
 import torch
+import numpy as np
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from torch.nn.modules import loss
@@ -9,7 +10,7 @@ from tqdm import tqdm
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
-import torchvision
+from torch.optim.lr_scheduler import StepLR
 from utils.model import UNET
 from utils.utils import (
     load_checkpoint,
@@ -18,20 +19,26 @@ from utils.utils import (
     check_accuracy,
     save_predictions_as_imgs,
 )
-from utils.Dice import DiceLoss
 from sklearn.model_selection import train_test_split
+from utils.lossModels import DiceLoss
+# Get the preprocessing functions
+import sys
+sys.path.append('/workspaces/P6-Automated-Hazard-Detection')
+from src.Preprocess.prep import PreProcess
+
 
 class UNETTrainer:
-    def __init__(self, base_folder, rgb_folder, mask_folder, image_size=[1920,1080], batch_size=1, epochs=70, learning_rate=1e-5, worker_threads = 2, NEW_SET=True, DEBUG_PLOT = False):
+    def __init__(self, base_folder, rgb_folder, mask_folder, image_size=[1920,1080], batch_size=1, epochs=70, learning_rate=1e-4, worker_threads = 2, loss_model=DiceLoss(), NEW_SET=True, DEBUG_PLOT = False):
         if NEW_SET:
             # Fix the folder for the UNET
             rgb_list = [f'{img}' for img in os.listdir(rgb_folder) if img.startswith("rgb_image")]
-            depth_list = [path.replace("rgb_image", "depth_image").replace("png", "raw") for path in rgb_list]
             mask_list = [f'{img}' for img in os.listdir(mask_folder)]
 
             mask_list = self._merge_masks(mask_folder, mask_list)
             rgb_list = self._onlyTruths(rgb_list, mask_list)
             train_folders, test_folders = self._split_images(base_folder, rgb_folder, mask_folder, rgb_list, mask_list)
+            # Preprocess the images
+            self._preprocess_images(train_folders, test_folders, rgb_folder)
         else:
             train_folders = [os.path.join(base_folder, "train_mask"), os.path.join(base_folder, "train_rgb")]
             test_folders = [os.path.join(base_folder, "test_mask"), os.path.join(base_folder, "test_rgb")]
@@ -86,8 +93,9 @@ class UNETTrainer:
                 ),
             }
         self.model = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.config["device"])
-        self.loss_fn = DiceLoss()
+        self.loss_fn = loss_model
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.config["learning_rate"])
+        self.scheduler = StepLR(self.optimizer, step_size=30, gamma=0.1)
         self.scaler = torch.cuda.amp.GradScaler()
         self.tb = SummaryWriter()
         self.max_score = 0
@@ -152,18 +160,14 @@ class UNETTrainer:
                     self.val_loader, self.model, folder=self.config["save_folder"], device=self.config["device"]
                 )
 
-            if epoch == 30:
-                print("Changing learning rate to 1e-5")
-                self.optimizer.param_groups[0]['lr'] = 1e-5
-            if epoch == 60:
-                print("Changing learning rate to 1e-6")
-                self.optimizer.param_groups[0]['lr'] = 1e-6
-
             print(f"EPOCH: {epoch}/{self.config['num_epochs']}")
             self.tb.add_scalar('Accuracy', acc, epoch)
             self.tb.add_scalar('Loss', loss / len(self.train_loader), epoch)
             self.tb.add_scalar('F1-score', F1, epoch)
             self.tb.add_scalar('IoU', IoU, epoch)
+            
+            # Next step in the scheduler
+            self.scheduler.step()
         self.tb.close()
     
     def _merge_masks(self, mask_folder, mask_list):
@@ -219,6 +223,70 @@ class UNETTrainer:
         for img in not_in_mask:
             rgb_list.remove(img)
         return rgb_list
+    
+    # Preprocess the images
+    def _preprocess_images(self, train_folders, test_folders, depth_folder):
+        pp = PreProcess()
+        # Get a list of the images
+        train_mask_list = os.listdir(train_folders[0])
+        train_rgb_list = os.listdir(train_folders[1])
+        test_mask_list = os.listdir(test_folders[0])
+        test_rgb_list = os.listdir(test_folders[1])
+        # Run through the images and preprocess them
+        for mask_file, rgb_file in tqdm(zip(train_mask_list, train_rgb_list), desc='Preprocessing train images'):
+            # Retrtieve the depth image
+            depth_file = os.path.join(depth_folder, rgb_file.replace("rgb_image", "depth_image").replace("png", "raw"))
+            depth = np.fromfile(depth_file, dtype=np.uint16)
+            # Reconstruct the depth map
+            depth = depth.reshape(int(1080), int(1920))
+            # load the images
+            mask = cv2.imread(os.path.join(train_folders[0], mask_file), cv2.IMREAD_GRAYSCALE)
+            rgb = cv2.imread(os.path.join(train_folders[1], rgb_file))
+            
+            # undistort the image
+            rgb = pp.undistort_images(rgb)
+            mask = pp.undistort_images(mask)
+            depth = pp.undistort_images(depth)
+            
+            # Warp the images
+            trans_img, homography_matrix = pp.retrieve_transformed_plane(rgb, depth)
+            trans_mask = cv2.warpPerspective(mask, homography_matrix, (trans_img.shape()[0],trans_img.shape()[1]))
+            
+            if np.any(trans_mask != 0):
+                # Save the images
+                cv2.imwrite(os.path.join(train_folders[0], mask_file), trans_mask)
+                cv2.imwrite(os.path.join(train_folders[1], rgb_file), trans_img)
+            else:
+                # Remove the images
+                os.remove(os.path.join(train_folders[0], mask_file))
+                os.remove(os.path.join(train_folders[1], rgb_file))
+        for mask_file, rgb_file in tqdm(zip(test_mask_list, test_rgb_list), desc='Preprocessing test images'):
+            # Retrtieve the depth image
+            depth_file = os.path.join(depth_folder, rgb_file.replace("rgb_image", "depth_image").replace("png", "raw"))
+            depth = np.fromfile(depth_file, dtype=np.uint16)
+            # Reconstruct the depth map
+            depth = depth.reshape(int(1080), int(1920))
+            # load the images
+            mask = cv2.imread(os.path.join(test_folders[0], mask_file), cv2.IMREAD_GRAYSCALE)
+            rgb = cv2.imread(os.path.join(test_folders[1], rgb_file))
+            
+            # undistort the image
+            rgb = pp.undistort_images(rgb)
+            mask = pp.undistort_images(mask)
+            depth = pp.undistort_images(depth)
+            
+            # Warp the images
+            trans_img, homography_matrix = pp.retrieve_transformed_plane(rgb, depth)
+            trans_mask = cv2.warpPerspective(mask, homography_matrix, (trans_img.shape()[0],trans_img.shape()[1]))
+
+            if np.any(trans_mask != 0):
+                # Save the images
+                cv2.imwrite(os.path.join(test_folders[0], mask_file), trans_mask)
+                cv2.imwrite(os.path.join(test_folders[1], rgb_file), trans_img)
+            else:
+                # Remove the images
+                os.remove(os.path.join(test_folders[0], mask_file))
+                os.remove(os.path.join(test_folders[1], rgb_file))
 
 
 def visualize_samples(image_folder, mask_folder, num_samples=5):
@@ -254,7 +322,7 @@ def main():
     rgb_folder = os.path.join(base_folder, "original/rgb_depth")
     mask_folder = os.path.join(base_folder, "original/masks/masks")
     #print(rgb_folder, mask_folder)
-    trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, NEW_SET=False, DEBUG_PLOT=False)
+    trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=4, batch_size=2, NEW_SET=False)
     trainer.train()
 
 

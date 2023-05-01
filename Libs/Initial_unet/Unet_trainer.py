@@ -17,7 +17,7 @@ from utils.utils import (
     check_accuracy,
     save_predictions_as_imgs,
 )
-from utils.Dice import DiceLoss
+from Libs.Initial_unet.utils.lossModels import DiceLoss
 import os
 
 # Hyperparameters etc.

@@ -24,18 +24,16 @@ class PreProcess:
         image = cv2.cvtColor(np.array(sharpened_img), cv2.COLOR_RGB2BGR)
         return image
     
-    def undistort_images(self, img, depth):
+    def undistort_images(self, img):
         """
         Undistort depth and RGB images, based on the camera intrinsics.
-        :param img: The RGB image, as a numpy.ndarray
-        :param depth: The depth image, as a numpy.ndarray (dtype=np.uint16)
-        :return: (numpy, numpy) The undistorted RGB image, and the undistorted depth image
+        :param img: Any image, as a numpy.ndarray
+        :return: (numpy) The undistorted image
         """
-        # Undistort the images
+        # Undistort the image
         img_undistorted = cv2.undistort(img, self.mtx, self.dist)
-        depth_undistorted = cv2.undistort(depth, self.mtx, self.dist)
         
-        return img_undistorted, depth_undistorted
+        return img_undistorted
     
     def retrieve_transformed_plane(self, img, depth, max_planes = 5):
         """
