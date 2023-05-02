@@ -50,7 +50,7 @@ class Segmentation:
             
             
     def _image_segment(self,model,image_np, out_x=1920, out_y=1080):
-        assert modeltype in ["Hazard","UN","CAO","PS","TSU","Lithium"], "Modeltype does not exist"
+        #assert modeltype in ["Hazard","UN","CAO","PS","TSU","Lithium"], "Modeltype does not exist"
         # Ensure the input is a NumPy array with the correct data type
         assert isinstance(image_np, np.ndarray), "Input must be a numpy.ndarray"
         assert image_np.dtype == np.uint8, "Input array must have dtype 'uint8'"
@@ -81,9 +81,8 @@ class Segmentation:
         preds = cv2.resize(preds, (out_x,out_y))
         return preds
     
-    def locateHazard(self,model,image_np, out_x=1920, out_y=1080):
-        model = self.Hazardmodel
-        return self._image_segment(model,image_np, out_x=1920, out_y=1080)
+    def locateHazard(self,image_np, out_x=1920, out_y=1080):
+        return self._image_segment(self.Hazardmodel,image_np, out_x, out_y)
     def locateUN(self,model,image_np, out_x=1920, out_y=1080):
         model = self.UNmodel
         return self._image_segment(model,image_np, out_x=1920, out_y=1080)

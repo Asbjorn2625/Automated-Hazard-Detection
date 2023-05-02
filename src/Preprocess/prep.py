@@ -5,11 +5,9 @@ import open3d as o3d
 
 
 class PreProcess:
-    def __init__(self, fetched_images):
-        self.image_fetcher = fetched_images
-        self.counter = 0
+    def __init__(self):
         # Load the camera intrinsics
-        with np.load("src/Data acquisition/calibration.npz") as a:
+        with np.load("src/Data_acquisition/calibration.npz") as a:
             self.mtx = a["mtx"]
             self.dist = a["dist"]
 
