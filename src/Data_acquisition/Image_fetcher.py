@@ -1,6 +1,7 @@
 import os
 import cv2
 import numpy as np
+from tqdm import tqdm
 
 class ImageFetcher:
     def __init__(self, path):
@@ -11,6 +12,10 @@ class ImageFetcher:
         self._fetch_depth()
 
     def _fetch_RGB(self):
+        """
+        Fetches all RGB images from the dataset folder
+        :return: None
+        """
         for root, dirs, files in os.walk(self.path):
             for file in files:
                 if file.endswith(".png"):
@@ -18,6 +23,10 @@ class ImageFetcher:
                     image = cv2.imread(image_path)
                     self.RGBimages.append((image_path, image))
     def _fetch_depth(self):
+        """
+        Fetches all depth images from the dataset folder
+        :return: None
+        """
         for root, dirs, files in os.walk(self.path):
             for file in files:
                 if file.endswith(".raw"):
@@ -34,8 +43,11 @@ class ImageFetcher:
                     mask = cv2.dilate(mask, kernel, iterations=2)
                     self.depthImages.append((raw_path, depth_image, mask))
     def get_images(self):
+        """Get depth images and RGB images that match
+        :return: list of tuples (RGB image, depth image)"""
+        
         images = []
-        for i in self.RGBimages:
+        for i in tqdm(self.RGBimages):
             file_nr1=i[0].replace(".png","").replace("Dataset/","").split("_")[2]
             for j in self.depthImages:
                 file_nr2=j[0].replace(".raw","").replace("Dataset/","").split("_")[2]
@@ -45,9 +57,30 @@ class ImageFetcher:
         depth_images = [img[1] for img in images]
         return rgb_images, depth_images
     def get_rgb_images(self):
-        return [img[1] for img in self.RGBimages]
+        """Get RGB images
+        :param: None
+        :return: list of tuples (filename, RGB image)"""
+        rgb_images = []
+        for img_path, img in self.RGBimages:
+            filename = os.path.basename(img_path)
+            rgb_images.append({"filename": filename, "image": img})
+        return rgb_images
     def get_depth_images(self):
-        return [img[1] for img in self.depthImages]
+        """Get depth images
+        :return: list of tuples (filename, depth image)"""
+        return [img[1] for img in tqdm(self.depthImages)]
+    def get_rgb_depth_images(self):
+        """Get RGB images and depth images that match
+        :return: list of tuples (RGB image, depth image)"""
+        lib = {}
+        for imgpath, img, mask in self.depthImages:
+            filename = os.path.basename(imgpath).replace(".raw","").replace("depth_","")
+            rgb = cv2.imread(imgpath.replace("depth","rgb").replace("raw","png"))
+            lib[filename] = rgb, img
+        return lib
+            
+            
+            
 
 
 

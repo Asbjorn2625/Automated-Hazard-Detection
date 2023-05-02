@@ -21,3 +21,4 @@ images/*/
 # Ignore the idea map from pycharm
 *.idea
 *.vscode
+*.jpg

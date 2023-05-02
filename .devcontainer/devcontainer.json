@@ -9,6 +9,7 @@
     "seccomp=unconfined",
     "--gpus=all",
     "--network=host",
+    "--shm-size=4g",
     "-e", "DISPLAY=host.docker.internal:0.0"
   ],
   "settings": {

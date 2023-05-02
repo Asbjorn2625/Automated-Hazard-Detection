@@ -1,5 +1,6 @@
 Cython
-numpy==1.21.5 
+numpy==1.21.5
+tensorboard==2.12.2
 matplotlib
 tqdm 
 scikit-learn
