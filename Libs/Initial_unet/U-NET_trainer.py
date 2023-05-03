@@ -288,10 +288,14 @@ class UNETTrainer:
 
 
 def visualize_samples(image_folder, mask_folder, num_samples=5):
+    import random
     image_files = os.listdir(image_folder)
     mask_files = os.listdir(mask_folder)
-
-    for i in range(num_samples):
+    
+    # Genrate random samples
+    random_samples = random.sample(range(0, len(image_files)), num_samples)
+    
+    for i in random_samples:
         image_file = os.path.join(image_folder, image_files[i])
         mask_file = os.path.join(mask_folder, mask_files[i])
 
@@ -320,7 +324,7 @@ def main():
     rgb_folder = os.path.join(base_folder, "original/rgb_depth")
     mask_folder = os.path.join(base_folder, "original/masks/masks")
     #print(rgb_folder, mask_folder)
-    trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=4, batch_size=2, NEW_SET=True, DEBUG_PLOT=True)
+    trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=0, batch_size=1, NEW_SET=False, DEBUG_PLOT=True)
     trainer.train()
 
 
