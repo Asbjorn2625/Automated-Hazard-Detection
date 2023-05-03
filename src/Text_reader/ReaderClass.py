@@ -8,7 +8,7 @@ import cv2
 class ReadText:
     # Start by loading the pre-trained CRAFT model
     def __init__(self):
-        self.craft = Craft("cuda:0" if torch.cuda.is_available() else "cpu")  # Use GPU if available, otherwise use CPU
+        self.craft = Craft(output_dir=None, cuda="cuda:0" if torch.cuda.is_available() else "cpu")  # Use GPU if available, otherwise use CPU
     
     
     def findText(self, img):
@@ -39,6 +39,16 @@ class ReadText:
         x3, y3 = box[2]
         x4, y4 = box[3]
 
+        # Find the angle of rotation
+        angle = -np.arctan2(y1 - y2, x1 - x2) * 180 / np.pi
+
+        # Get the center point of the text region
+        center = np.mean([(x1, y1), (x2, y2), (x3, y3), (x4, y4)], axis=0)
+
+        # Create the rotation matrix and apply it
+        rot_mat = cv2.getRotationMatrix2D(tuple(center), angle, 1)
+        rotated_image = cv2.warpAffine(image, rot_mat, (image.shape[1], image.shape[0]))
+        
         xmin = min(x1, x2, x3, x4)
         xmax = max(x1, x2, x3, x4)
         ymin = min(y1, y2, y3, y4)
@@ -50,13 +60,13 @@ class ReadText:
         ymin = int(ymin) - padding
         ymax = int(ymax) + padding
 
-        (h, w) = image.shape[:2]
+        (h, w) = rotated_image.shape[:2]
         xmin = max(0, xmin)
         ymin = max(0, ymin)
         xmax = min(w, xmax)
         ymax = min(h, ymax)
         
-        cropped_image = image[ymin:ymax, xmin:xmax]
+        cropped_image = rotated_image[ymin:ymax, xmin:xmax]
         
         if ymax - ymin > xmax - xmin:
             cropped_image = cv2.rotate(cropped_image, cv2.ROTATE_90_CLOCKWISE)
