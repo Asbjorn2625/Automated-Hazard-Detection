@@ -19,7 +19,7 @@ config = rs.config()
 
 # Add the RGB and depth streams to the configuration
 config.enable_stream(rs.stream.color, 1920, 1080, rs.format.bgr8, 15)
-config.enable_stream(rs.stream.depth, int(1920/3), int(1080/3), rs.format.z16, 15)
+config.enable_stream(rs.stream.depth, int(1280), int(720), rs.format.z16, 15)
 
 # Start the pipeline
 profile = pipeline.start(config)
