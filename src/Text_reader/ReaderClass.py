@@ -18,7 +18,7 @@ class ReadText:
         :return: list Bounding boxes [corner1, corner2, corner3, corner4]
         """
         # Detect text regions
-        prediction_result = self.craft.detect_text(img)
+        prediction_result = self.craft.detect_text(img.copy())
         return prediction_result["boxes"]
 
     
