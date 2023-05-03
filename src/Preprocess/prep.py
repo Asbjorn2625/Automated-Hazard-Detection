@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter
 import open3d as o3d
+import itertools
 
 
 class PreProcess:
@@ -35,9 +36,9 @@ class PreProcess:
         
         return img_undistorted
     
-    def retrieve_transformed_plane(self, img, depth, max_planes = 5):
+    def retrieve_transformed_plane(self, img, depth, max_planes = 5, mask=None):
         """
-        Transforms the RGB image and the depth image to a point cloud and segments front plane from the point cloud.
+        Transforms the RGB image and the depth image to a point cloud and segments front plane from the point cloud suing RANSAC.
         :param img: The RGB image, as a numpy.ndarray
         :param depth: The depth image, as a numpy.ndarray (dtype=np.uint16)
         :param max_planes: The maximum number of planes to segment from the point cloud
@@ -63,14 +64,24 @@ class PreProcess:
             angle_y = np.degrees(np.arccos(np.dot(normal_vector, np.array([1, 0, 0])))) # Our camera is turned, so the floor is on the horizontal
             angle_x = np.degrees(np.arccos(np.dot(normal_vector, np.array([0, 0, 1])))) # the closer to zero the closer to being orthogonal to the cameras optical axis
             
+            # Parameters for filtering planes
+            min_distance_from_camera = 0.2  # In meters
+            min_cardboard_area = 80000
+            min_cardboard_normal_angle = 35
+
             # Remove the floor and noisy data
-            if angle_y < 35 or len(inliers) < 80000: # floor is closer to 0 degrees, inliers descirbes amount of points in the plane
-                # remove the points from the point cloud.
-                plane_points = point_cloud.select_by_index(inliers)
+            plane_points = point_cloud.select_by_index(inliers)
+            mean_point = np.mean(np.asarray(plane_points.points), axis=0)
+
+            # Calculate distance from the camera
+            distance_from_camera = np.linalg.norm(mean_point)
+
+            if (angle_y < min_cardboard_normal_angle or
+                len(inliers) < min_cardboard_area or
+                distance_from_camera < min_distance_from_camera):
+                # Remove the plane points from the point cloud.
                 point_cloud = point_cloud.select_by_index(inliers, invert=True)
                 continue
-            if len(inliers) == 0:
-                break  # No more planes found
             # Find the angle difference to the camera's optical axis
             angle_diff = abs(angle_x)
             if angle_diff < min_angle_diff:
@@ -80,14 +91,14 @@ class PreProcess:
                 best_plane_normal_vector = point_cloud.select_by_index(inliers, invert=True)
         # In case there is nothing to be found
         if best_plane_inliers is None:
-            return np.zeros_like(img)
+            return np.zeros_like(img), None
         # Extract the best ones
         plane_points = best_plane_inliers
         point_cloud = best_plane_normal_vector
         
         # Remove points with low depth values (e.g., less than 0.1 meters)
-        mask = np.asarray(point_cloud.points)[:, 2] > 0.1
-        point_cloud = point_cloud.select_by_index(np.where(mask)[0])
+        background_mask = np.asarray(point_cloud.points)[:, 2] > 0.1
+        point_cloud = point_cloud.select_by_index(np.where(background_mask)[0])
 
         # Project the plane points back onto the image plane.
         plane_points_image = self._project_points_to_image(np.asarray(plane_points.points))
@@ -102,20 +113,29 @@ class PreProcess:
         plane_mask[valid_points_image[:, 1].round().astype(int), valid_points_image[:, 0].round().astype(int)] = 255
         # Remove noise
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9,9))
-        eroded = cv2.erode(cv2.cvtColor(plane_mask, cv2.COLOR_RGB2GRAY), kernel, iterations=1)
+        eroded = cv2.erode(cv2.cvtColor(plane_mask, cv2.COLOR_RGB2GRAY), kernel, iterations=3)
         dilated = cv2.dilate(eroded, kernel, iterations=5)
         # Get the convex hull
-        contours, _ = cv2.findContours(dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        hull = cv2.convexHull(contours[0])
+        contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        largest_contour = max(contours, key=cv2.contourArea)
+
         # Approximate the convex hull with a polygonal curve
-        epsilon = 0.1 * cv2.arcLength(hull, True)
-        corners = cv2.approxPolyDP(hull, epsilon, True)
+        epsilon = 0.02 * cv2.arcLength(largest_contour, True)
+        corners = cv2.approxPolyDP(largest_contour, epsilon, True)
+        
+        # If we have less than 4 corners something went wrong
+        if len(corners) < 4:
+            return (np.zeros_like(img), None) if mask is None else (np.zeros_like(img), None, np.zeros_like(mask))
         
         # Use the corners to transform the image to a plane view
-        output_image, homography_matrix = self._transform_rgb_image_to_plane_view(img, corners)
+        if mask is None:
+            output_image, homography_matrix = self._transform_image_to_plane_view(img, corners)
+            return output_image, homography_matrix
+        else:
+            output_image, homography_matrix, output_mask = self._transform_image_to_plane_view(img, corners, mask=mask)
+            return output_image, homography_matrix, output_mask
         
-        return output_image, homography_matrix
-        
+      
     def transformed_to_original_pixel(self, transformed_pixel, homography_matrix):
         """
         Convert pixel coordinates in the transformed image back to the original image.
@@ -182,38 +202,93 @@ class PreProcess:
         uv = (valid_points @ self.mtx.T)[:, :2] / valid_points[:, 2, np.newaxis]
         return uv.round().astype(int)
     
-    def _transform_rgb_image_to_plane_view(self, rgb_image, plane_points):
+    def _find_best_square(self, points, threshold=10):
+        # Calculate the convex hull of the points
+        hull = cv2.convexHull(points)
+
+        best_square = None
+        min_error = float("inf")
+
+        # Iterate through all possible combinations of 4 points in the convex hull
+        for combination in itertools.combinations(hull, 4):
+            square_points = np.array(combination).reshape(-1, 2)
+            # Compute the angles between the edges of the quadrilateral
+            angles = []
+            for i in range(4):
+                a, b, c = square_points[i], square_points[(i + 1) % 4], square_points[(i + 2) % 4]
+                ab = a - b
+                bc = c - b
+                angle = np.arccos(np.dot(ab, bc) / (np.linalg.norm(ab) * np.linalg.norm(bc)))
+                angles.append(angle)
+
+            # Check if the angles are close to 90 degrees (pi/2 radians)
+            deviation = np.sum(np.abs(np.array(angles) - np.pi/2))
+            if deviation < min_error:
+                min_error = deviation
+                best_square = square_points
+
+            if min_error < threshold:
+                break
+
+        return best_square
+
+    
+    def _transform_image_to_plane_view(self, rgb_image, plane_points, mask=None):
         """
         transform the RGB image depending on the plane points
         :param rgb_image: np.ndarray, RGB image
         :param plane_points: np.ndarray, [[[x1, y1]], [[x2, y2]], [[x3, y3]], [[x4, y4]]]
         :return: (np array, np array), transformed image and homography matrix
         """
-        # Reshape the plane_points to (4, 2)
         plane_points = plane_points.reshape(-1, 2)
 
-        # Sort the plane points based on their y-coordinates
-        sorted_points = plane_points[np.argsort(plane_points[:, 1]), :]
+        # Find the best square from the given points
+        best_square = self._find_best_square(plane_points)
+        
+        # Rearrange the points to be in the order: top-left, top-right, bottom-right, bottom-left
+        tl, tr, bl, br = best_square
+        if tr[0] < tl[0]:
+            tl, tr = tr, tl
+        if bl[0] > br[0]:
+            bl, br = br, bl
 
-        # Get the closest two points and compute the height of the output image
-        closest_points = sorted_points[:2, :]
-        output_height = int(np.linalg.norm(closest_points[0] - closest_points[-1]))
+        # Define the destination points for the perspective transform
+        width = max(int(np.linalg.norm(tr - tl)), int(np.linalg.norm(br - bl)))
+        height = max(int(np.linalg.norm(tl - bl)), int(np.linalg.norm(tr - br)))
 
-        # Compute the width of the output image based on the aspect ratio
-        aspect_ratio = rgb_image.shape[1] / rgb_image.shape[0]
-        output_width = int(output_height * aspect_ratio)
-        # Define the destination points for the transformation (rectangle)
-        destination_points = np.array([
-            [0, 0],
-            [output_width - 1, 0],
-            [output_width - 1, output_height - 1],
-            [0, output_height - 1]
-        ], dtype=np.float32)
+        destination_points = np.float32([[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]])
 
         # Compute the homography matrix
-        homography_matrix, _ = cv2.findHomography(plane_points, destination_points)
+        source_points = np.float32([tl, tr, br, bl])
+
+        # Compute the homography matrix
+        homography_matrix, _ = cv2.findHomography(source_points, destination_points)
 
         # Warp the RGB image using the computed homography matrix
-        transformed_image = cv2.warpPerspective(rgb_image, homography_matrix, (output_width, output_height))
-
-        return transformed_image, homography_matrix
+        transformed_image = cv2.warpPerspective(rgb_image, homography_matrix, (width, height))
+        """
+        # Put the transformed image in the center of a black background
+        rgb_background = np.zeros_like(rgb_image)
+        
+        # Calculate the position of the top-left corner of the transformed image in the background
+        start_y = (rgb_background.shape[0] - transformed_image.shape[0]) // 2
+        start_x = (rgb_background.shape[1] - transformed_image.shape[1]) // 2
+        
+        print("Original image dimensions:", rgb_image.shape)
+        print("Transformed image dimensions:", transformed_image.shape)
+        print("Start coordinates (y, x):", start_y, start_x)
+        
+        # Put the transformed image in the center of the black background
+        rgb_background[start_y:start_y+transformed_image.shape[0], start_x:start_x+transformed_image.shape[1]] = transformed_image
+        """
+        if mask is None:
+            return transformed_image, homography_matrix
+        # Transform the mask if it is provided    
+        transformed_mask = cv2.warpPerspective(mask, homography_matrix, (width, height))
+        
+        # Put the transformed image in the center of a black background
+        #mask_background = np.zeros_like(mask)
+        #mask_background[start_y:start_y+transformed_mask.shape[0], start_x:start_x+transformed_mask.shape[1]] = transformed_mask
+        
+        return transformed_image, homography_matrix, transformed_mask
+        

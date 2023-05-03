@@ -238,7 +238,7 @@ class UNETTrainer:
             depth_file = os.path.join(depth_folder, rgb_file.replace("rgb_image", "depth_image").replace("png", "raw"))
             depth = np.fromfile(depth_file, dtype=np.uint16)
             # Reconstruct the depth map
-            depth = depth.reshape(int(1080), int(1920))
+            depth = depth.reshape(1080, 1920)
             # load the images
             mask = cv2.imread(os.path.join(train_folders[0], mask_file), cv2.IMREAD_GRAYSCALE)
             rgb = cv2.imread(os.path.join(train_folders[1], rgb_file))
@@ -249,8 +249,7 @@ class UNETTrainer:
             depth = pp.undistort_images(depth)
             
             # Warp the images
-            trans_img, homography_matrix = pp.retrieve_transformed_plane(rgb, depth)
-            trans_mask = cv2.warpPerspective(mask, homography_matrix, (trans_img.shape()[0],trans_img.shape()[1]))
+            trans_img, _, trans_mask = pp.retrieve_transformed_plane(rgb, depth, mask=mask)
             
             if np.any(trans_mask != 0):
                 # Save the images
@@ -276,8 +275,7 @@ class UNETTrainer:
             depth = pp.undistort_images(depth)
             
             # Warp the images
-            trans_img, homography_matrix = pp.retrieve_transformed_plane(rgb, depth)
-            trans_mask = cv2.warpPerspective(mask, homography_matrix, (trans_img.shape()[0],trans_img.shape()[1]))
+            trans_img, _, trans_mask = pp.retrieve_transformed_plane(rgb, depth, mask=mask)
 
             if np.any(trans_mask != 0):
                 # Save the images
@@ -322,7 +320,7 @@ def main():
     rgb_folder = os.path.join(base_folder, "original/rgb_depth")
     mask_folder = os.path.join(base_folder, "original/masks/masks")
     #print(rgb_folder, mask_folder)
-    trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=4, batch_size=2, NEW_SET=False)
+    trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=4, batch_size=2, NEW_SET=True, DEBUG_PLOT=True)
     trainer.train()
 
 
