@@ -118,13 +118,25 @@ class PreProcess:
         # Get the convex hull
         contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         largest_contour = max(contours, key=cv2.contourArea)
-
-        # Approximate the convex hull with a polygonal curve
-        epsilon = 0.02 * cv2.arcLength(largest_contour, True)
-        corners = cv2.approxPolyDP(largest_contour, epsilon, True)
+        hull = cv2.convexHull(largest_contour)
         
-        # If we have less than 4 corners something went wrong
-        if len(corners) < 4:
+        # Approximate the convex hull with a polygonal curve
+        epsilon = 0.08 * cv2.arcLength(hull, True)
+        approx = cv2.approxPolyDP(hull, epsilon, True)
+        
+        if len(approx) == 4:
+            corners = np.squeeze(approx)
+        else:
+            # Fallback in case the contour approximation doesn't result in 4 points
+            print(f"Warning: Found {len(approx)} points instead of 4. Using the 4 most extreme points as corners.")
+            corners = np.zeros((4, 2), dtype=np.float32)
+            corners[0] = tuple(largest_contour[largest_contour[:, :, 0].argmin()][0])  # leftmost point
+            corners[1] = tuple(largest_contour[largest_contour[:, :, 1].argmin()][0])  # topmost point
+            corners[2] = tuple(largest_contour[largest_contour[:, :, 0].argmax()][0])  # rightmost point
+            corners[3] = tuple(largest_contour[largest_contour[:, :, 1].argmax()][0])  # bottommost point
+
+        # If we don't have 4 corners something went wrong
+        if len(corners) != 4:
             return (np.zeros_like(img), None) if mask is None else (np.zeros_like(img), None, np.zeros_like(mask))
         
         # Use the corners to transform the image to a plane view
