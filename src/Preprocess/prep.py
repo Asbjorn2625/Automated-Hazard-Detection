@@ -201,36 +201,6 @@ class PreProcess:
         # Project the valid points onto the image plane.
         uv = (valid_points @ self.mtx.T)[:, :2] / valid_points[:, 2, np.newaxis]
         return uv.round().astype(int)
-    
-    def _find_best_square(self, points, threshold=10):
-        # Calculate the convex hull of the points
-        hull = cv2.convexHull(points)
-
-        best_square = None
-        min_error = float("inf")
-
-        # Iterate through all possible combinations of 4 points in the convex hull
-        for combination in itertools.combinations(hull, 4):
-            square_points = np.array(combination).reshape(-1, 2)
-            # Compute the angles between the edges of the quadrilateral
-            angles = []
-            for i in range(4):
-                a, b, c = square_points[i], square_points[(i + 1) % 4], square_points[(i + 2) % 4]
-                ab = a - b
-                bc = c - b
-                angle = np.arccos(np.dot(ab, bc) / (np.linalg.norm(ab) * np.linalg.norm(bc)))
-                angles.append(angle)
-
-            # Check if the angles are close to 90 degrees (pi/2 radians)
-            deviation = np.sum(np.abs(np.array(angles) - np.pi/2))
-            if deviation < min_error:
-                min_error = deviation
-                best_square = square_points
-
-            if min_error < threshold:
-                break
-
-        return best_square
 
     
     def _transform_image_to_plane_view(self, rgb_image, plane_points, mask=None):
@@ -242,11 +212,11 @@ class PreProcess:
         """
         plane_points = plane_points.reshape(-1, 2)
 
-        # Find the best square from the given points
-        best_square = self._find_best_square(plane_points)
-        
+        # Sort the plane_points by their x and y values
+        sorted_points = np.array(sorted(plane_points, key=lambda x: (x[1], x[0])))
+
         # Rearrange the points to be in the order: top-left, top-right, bottom-right, bottom-left
-        tl, tr, bl, br = best_square
+        tl, tr, bl, br = sorted_points
         if tr[0] < tl[0]:
             tl, tr = tr, tl
         if bl[0] > br[0]:
@@ -266,7 +236,7 @@ class PreProcess:
 
         # Warp the RGB image using the computed homography matrix
         transformed_image = cv2.warpPerspective(rgb_image, homography_matrix, (width, height))
-        """
+    
         # Put the transformed image in the center of a black background
         rgb_background = np.zeros_like(rgb_image)
         
@@ -280,15 +250,15 @@ class PreProcess:
         
         # Put the transformed image in the center of the black background
         rgb_background[start_y:start_y+transformed_image.shape[0], start_x:start_x+transformed_image.shape[1]] = transformed_image
-        """
+
         if mask is None:
             return transformed_image, homography_matrix
         # Transform the mask if it is provided    
         transformed_mask = cv2.warpPerspective(mask, homography_matrix, (width, height))
         
         # Put the transformed image in the center of a black background
-        #mask_background = np.zeros_like(mask)
-        #mask_background[start_y:start_y+transformed_mask.shape[0], start_x:start_x+transformed_mask.shape[1]] = transformed_mask
+        mask_background = np.zeros_like(mask)
+        mask_background[start_y:start_y+transformed_mask.shape[0], start_x:start_x+transformed_mask.shape[1]] = transformed_mask
         
         return transformed_image, homography_matrix, transformed_mask
         

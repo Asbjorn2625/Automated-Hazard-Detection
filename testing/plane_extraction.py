@@ -24,7 +24,9 @@ for image in rgb_images:
     img = pp.undistort_images(img)
     depth = pp.undistort_images(depth)
     
-    trans_img, homography = pp.retrieve_transformed_plane(img, depth)
+    depth_blurred = cv2.medianBlur(depth, 5)
+    
+    trans_img, homography = pp.retrieve_transformed_plane(img, depth_blurred)
     
     # Draw somewhere random on the image
     #x, y = random.randint(0, 400), random.randint(0, 400)
