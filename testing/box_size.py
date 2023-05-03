@@ -2,6 +2,14 @@ import numpy as np
 import cv2
 import os
 import open3d as o3d
+import sys
+sys.path.append('/workspaces/P6-Automated-Hazard-Detection')
+
+from src.Preprocess.prep import PreProcess
+
+pp = PreProcess()
+mtx = pp.mtx
+dist = pp.dist
 
 # Function to get the current real world pixel size
 def get_pixelsize(depth):
@@ -101,9 +109,7 @@ def transform_rgb_image_to_plane_view(rgb_image, plane_points, output_size=(400,
 rgb_images = [f'./testing/first data set/{img}' for img in os.listdir("./testing/first data set") if img.startswith("rgb_image")]
 
 # Load the intrinsics
-with np.load("src/Data acquisition/calibration.npz") as a:
-    mtx = a["mtx"]
-    dist = a["dist"]
+
 
 
 # Loop through the images
@@ -115,6 +121,8 @@ for image in rgb_images:
     # Undistort an image
     img_undistorted = cv2.undistort(img, mtx, dist)
     depth_undistorted = cv2.undistort(depth, mtx, dist)
+    
+    depth_undistorted = cv2.medianBlur(depth_undistorted, 5)
     
     # Remove background - Set pixels below the threshold as black
     grey_color = 0

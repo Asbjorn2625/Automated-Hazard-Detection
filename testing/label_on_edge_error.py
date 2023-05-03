@@ -52,8 +52,8 @@ def labels_on_edge(cnt):
             label_bent = False
         print(label_bent)
         
-        display_image2 = cv2.resize(color, (854,480), interpolation=cv2.INTER_CUBIC)
-        cv2.imshow("label on edge", display_image2)
+       # display_image2 = cv2.resize(color, (854,480), interpolation=cv2.INTER_CUBIC)
+        cv2.imshow("label on edge", color)
         
         #cv2.imshow("label on edge", color )   
         
@@ -83,8 +83,8 @@ def label_oriention(cnt):
     dy = farthest_pt[1] - cy
     angle = np.arctan2(dy, dx) * 180 / np.pi
     print(angle)
-    display_image = cv2.resize(color, (854,480), interpolation=cv2.INTER_CUBIC)
-    cv2.imshow("angle", display_image)
+    #display_image = cv2.resize(color, (854,480), interpolation=cv2.INTER_CUBIC)
+    #cv2.imshow("angle", color)
     return angle
 
 
@@ -113,22 +113,222 @@ def convex_hull_oriention(cnt):
         dy = max_depth_end[1] - max_depth_start[1]
         angle = np.arctan2(dy, dx) * 180 / np.pi
         print(angle)
-        display_image3 = cv2.resize(color, (854,480), interpolation=cv2.INTER_CUBIC)
-        cv2.imshow("angle", display_image3)
+        #display_image3 = cv2.resize(color, (854,480), interpolation=cv2.INTER_CUBIC)
+        cv2.imshow("angle", color)
         return angle
     else:
         return None
+    
+    
+def convex(cnt):
+    hull = cv2.convexHull(cnt)
+
+    # Approximate the contour with a polygon
+    epsilon = 0.01 * cv2.arcLength(hull, True)
+    approx = cv2.approxPolyDP(hull, epsilon, True)
+
+    # Find the minimum area rectangle that bounds the polygon
+    rect = cv2.minAreaRect(approx)
+
+    # Get the rotation angle of the rectangle
+    angle = rect[2]
+
+
+    # Draw the rotated rectangle onto the original image
+    box = cv2.boxPoints(rect)
+    box = np.int0(box)
+    cv2.drawContours(color, [box], 0, (0, 0, 255), 2)
+
+    # Print the rotation angle
+    print('Rotation angle:', angle)
+    cv2.imshow("angle", color)
+
+
+
+
+
+def segments_intersect(p1, q1, p2, q2):
+    # Returns True if line segment p1-q1 intersects with line segment p2-q2
+    # Source: https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/
+    o1 = orientation1(p1, q1, p2)
+    o2 = orientation1(p1, q1, q2)
+    o3 = orientation1(p2, q2, p1)
+    o4 = orientation1(p2, q2, q1)
+    
+    if o1 != o2 and o3 != o4:
+        print("yes")
+        return True
+    
+    if o1 == 0 and on_segment(p1, p2, q1):
+        print("edge 1")
+        return True
+    
+    if o2 == 0 and on_segment(p1, q2, q1):
+        print("edge 2")
+        return True
+    
+    if o3 == 0 and on_segment(p2, p1, q2):
+        print("edge 3")
+        return True
+    
+    if o4 == 0 and on_segment(p2, q1, q2):
+        print("edge 4")
+        return True
+    
+    return False
+
+def orientation1(p, q, r):
+    # Returns the orientation of the triplet (p, q, r)
+    # 0 = colinear, 1 = clockwise, 2 = counterclockwise
+    # Source: https://www.geeksforgeeks.org/orientation-3-ordered-points/
+    val = (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])
+    
+    if val == 0:
+        return 0
+    elif val > 0:
+        return 2
+    else:
+        return 1
+    
+    
+    
+def on_segment(p, q, r):
+# Returns True if point q lies on line segment pr
+# Source: https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/
+    if (q[0] <= max(p[0], r[0]) and q[0] >= min(p[0], r[0]) and
+    q[1] <= max(p[1], r[1]) and q[1] >= min(p[1], r[1])):
+        return True
+    else:
+        return False    
+    
+
+    
+def hough(cnt):
+    # Apply the Canny edge detector to find edges in the image
+    edges = cv2.Canny(img_gray, 50, 150, apertureSize=3)
+
+    cv2.imshow("edge", edges)
+
+    # Apply the Hough transform to detect lines in the image
+    lines = cv2.HoughLines(edges, rho=1, theta=np.pi/180, threshold=100)
+
+    print(np.max(img_gray.shape))
+
+    max_line_length = np.max(img_gray.shape)
+
+    # Check for four lines that form a square
+    if lines is not None:
+        for i in range(len(lines)):
+            rho1, theta1 = lines[i][0]
+            a1 = np.cos(theta1)
+            b1 = np.sin(theta1)
+            x10 = a1 * rho1
+            y10 = b1 * rho1
+            x11 = int(x10 + max_line_length * (-b1))
+            y11 = int(y10 + max_line_length * (a1))
+            x12 = int(x10 - max_line_length * (-b1))
+            y12 = int(y10 - max_line_length * (a1))
+            
+            for j in range(i+1, len(lines)):
+                rho2, theta2 = lines[j][0]
+                a2 = np.cos(theta2)
+                b2 = np.sin(theta2)
+                x20 = a2 * rho2
+                y20 = b2 * rho2
+                x21 = int(x20 + max_line_length * (-b2))
+                y21 = int(y20 + max_line_length * (a2))
+                x22 = int(x20 - max_line_length * (-b2))
+                y22 = int(y20 - max_line_length * (a2))
+                
+                # Check if the angle between the two lines is close to 90 degrees
+                angle = np.abs(np.arctan2(b1, a1) - np.arctan2(b2, a2)) * 180 / np.pi
+                
+                if np.abs(angle - 90) < 10:
+                    for k in range(j+1, len(lines)):
+                        rho3, theta3 = lines[k][0]
+                        a3 = np.cos(theta3)
+                        b3 = np.sin(theta3)
+                        x30 = a3 * rho3
+                        y30 = b3 * rho3
+                        x31 = int(x30 + max_line_length * (-b3))
+                        y31 = int(y30 + max_line_length * (a3))
+                        x32 = int(x30 - max_line_length * (-b3))
+                        y32 = int(y30 - max_line_length * (a3))
+                        
+                        # Check if the angle between the third line and the first two lines is close to 90 degrees
+                        angle = np.abs(np.arctan2(b1, a1) - np.arctan2(b3, a3)) * 180 / np.pi
+                        
+                        if np.abs(angle - 90) < 10:
+                            # Check if the fourth line intersects with the other three lines to form a square
+                            for l in range(k+1, len(lines)):
+                                rho4, theta4 = lines[l][0]
+                                a4 = np.cos(theta4)
+                                b4 = np.sin(theta4)
+                                x40 = a4 * rho4
+                                y40 = b4 * rho4
+                                x41 = int(x40 + max_line_length * (-b4))
+                                y41 = int(y40 + max_line_length * (a4))
+                                x42 = int(x40 - max_line_length * (-b4))
+                                y42 = int(y40 - max_line_length * (a4))
+                                
+                                                            # Check if the angle between the fourth line and the first three lines is close to 90 degrees
+                            angle = np.abs(np.arctan2(b1, a1) - np.arctan2(b4, a4)) * 180 / np.pi
+                            
+                            if np.abs(angle - 90) < 10:
+                                
+                                
+                                
+                                # Check if the fourth line intersects with the other three lines to form a square
+                                pt1 = np.array([x11, y11])
+                                pt2 = np.array([x12, y12])
+                                pt3 = np.array([x21, y21])
+                                pt4 = np.array([x22, y22])
+                                pt5 = np.array([x31, y31])
+                                pt6 = np.array([x32, y32])
+                                pt7 = np.array([x41, y41])
+                                pt8 = np.array([x42, y42])
+                                #print(pt1)
+                                
+                                
+                                # Draw the four lines that form a square
+                                cv2.line(color, (x11, y11), (x12, y12), (0, 0, 255), 2)
+                                cv2.line(color, (x21, y21), (x22, y22), (0, 0, 255), 2)
+                                cv2.line(color, (x31, y31), (x32, y32), (0, 0, 255), 2)
+                                cv2.line(color, (x41, y41), (x42, y42), (0, 0, 255), 2)
+                                #cv2.circle(color, (x11,y11),500,(255,255,0),1000)
+                                
+                                intersects = (segments_intersect(pt1, pt3, pt2, pt4) or
+                                              segments_intersect(pt1, pt5, pt2, pt6) or
+                                              segments_intersect(pt1, pt7, pt2, pt8))
+                                
+                                if intersects:
+                                    print("k")
+                                    
+                                    # Draw the four lines that form a square
+                                    cv2.line(color, (x11, y11), (x12, y12), (0, 0, 255), 2)
+                                    cv2.line(color, (x21, y21), (x22, y22), (0, 0, 255), 2)
+                                    cv2.line(color, (x31, y31), (x32, y32), (0, 0, 255), 2)
+                                    cv2.line(color, (x41, y41), (x42, y42), (0, 0, 255), 2)
+
+    cv2.imshow("angle", color)
+
+            
+    
+
+    
+
+            
+            
+    
 
 
 # Replace 'your_folder_path' with the actual path to your folder containing images
-mask_folder_path = 'testing/yodo'
+mask_folder_path = 'testing/Out_cropped_hazard_rgb'
 
 
 
 # List all files in the folder
 file_list = os.listdir(mask_folder_path)
-print(file_list)
-
 for file in file_list:
     # Check if the file is an image (e.g., has a .jpg or .png extension)
     if file.lower().endswith(('.png')):
@@ -137,20 +337,16 @@ for file in file_list:
 
         img_gray = cv2.imread(file_path, 0)
 
-        img_gray, original_image = compare_to_original_image(img_gray)
+        #img_gray, original_image = compare_to_original_image(img_gray)
 
         color = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR)
 
-        # get the shape of the image
-
-        #thresholding the white background away
-        img_thresh = cv2.threshold(img_gray, 0, 5, cv2.THRESH_BINARY)[1]
 
         #inverting the binary image so it works
         #img_thresh = cv2.bitwise_not(img_thresh)
 
         #getting the contours
-        contours = cv2.findContours(img_thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
+        contours = cv2.findContours(img_gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
 
         for cnt in contours:
             # get the area of the contour
@@ -163,7 +359,9 @@ for file in file_list:
 
                 #label_oriention(cnt)
                 
-                convex_hull_oriention(cnt)
+                #convex(cnt)
+                
+                hough(cnt)
         
 
                 break

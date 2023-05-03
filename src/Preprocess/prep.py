@@ -8,7 +8,7 @@ import itertools
 class PreProcess:
     def __init__(self):
         # Load the camera intrinsics
-        with np.load("src/Data acquisition/calibration.npz") as a:
+        with np.load("src/Data_acquisition/calibration.npz") as a:
             self.mtx = a["mtx"]
             self.dist = a["dist"]
     def image_enhancer(self, image):
