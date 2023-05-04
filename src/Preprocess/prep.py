@@ -3,14 +3,22 @@ import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter
 import open3d as o3d
 import itertools
-
+import os
 
 class PreProcess:
     def __init__(self):
         # Load the camera intrinsics
-        with np.load("src/Data_acquisition/calibration.npz") as a:
-            self.mtx = a["mtx"]
-            self.dist = a["dist"]
+        try:
+            with np.load("src/Data_acquisition/calibration.npz") as a:
+                self.mtx = a["mtx"]
+                self.dist = a["dist"]
+        except FileNotFoundError:
+            parent_folder = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            path = os.path.join(parent_folder, "Data_acquisition/calibration.npz")
+            with np.load(path) as a:
+                self.mtx = a["mtx"]
+                self.dist = a["dist"]
+
     def image_enhancer(self, image):
         # Convert numpy.ndarray to PIL Image
         pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
