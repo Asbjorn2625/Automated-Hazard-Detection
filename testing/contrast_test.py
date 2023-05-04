@@ -31,6 +31,9 @@ rgb_images = [f'./testing/New_reading_test/{img}' for img in os.listdir("./testi
 for image in rgb_images:
     img = cv2.imread(image)
     
+
+    
+    
     depth = np.fromfile(image.replace("rgb_image", "depth_image").replace("png", "raw"), dtype=np.uint16)
     # Reconstruct the depth map
     depth = depth.reshape(int(1080), int(1920))
@@ -42,22 +45,30 @@ for image in rgb_images:
     
     depth_blurred = cv2.medianBlur(depth, 5)
     
-    trans_img, homography = pp.retrieve_transformed_plane(img, depth_blurred)
-
-    box_text = read.findText(trans_img)
     
-    resized_depth_img = cv2.resize(trans_img, (960, 540))
+    
+    trans_img, homography = pp.retrieve_transformed_plane(img, depth_blurred)    
+
+
+
+    # Increase brightness by 50
+    alpha = 1
+    beta = 0
+    brightened_img = cv2.convertScaleAbs(trans_img, alpha=alpha, beta=-20)
+    
+    
+    box_text = read.findText(brightened_img)
+    
+    #resized_depth_img = cv2.resize(brightened_img, (960, 540))
     
     resized_img = cv2.resize(img, (960, 540))  
-    
-    
             
     #cv2.imshow("img", resized_depth_img)
     #cv2.imshow("img1", resized_img)
     for box in box_text:
-        
-       
-        text = read.readText(trans_img, box, False, True)
+    
+        text, segmented = read.readText(brightened_img, box, False, True)
+        cv2.imshow("segs",segmented)
         print("text was found: " , text)
         
         
@@ -65,8 +76,15 @@ for image in rgb_images:
 
     
     cv2.waitKey(0)
-
-
-    
-       
-        
+"""
+    # display result
+    show_img = cv2.resize(trans_img, (960, 540))
+    show_mask = cv2.resize(mask, (960, 540))  
+    show_result = cv2.resize(result, (960, 540))  
+    show_Clahe =   cv2.resize(img_clahe, (960, 540))  
+    cv2.imshow('Original Image', show_img)
+    cv2.imshow('Mask', show_mask)
+    cv2.imshow('eq_histo', show_result)
+    cv2.imshow('Clahe', brightened_img)
+    cv2.waitKey(0)
+    """

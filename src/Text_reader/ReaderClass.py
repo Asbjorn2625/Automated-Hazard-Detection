@@ -22,7 +22,7 @@ class ReadText:
         return prediction_result["boxes"]
 
     
-    def readText(self, image, box, display=False, config='-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./- --psm 6 --oem 3', padding=10):
+    def readText(self, image, box, display=False, Check_color=False, config='-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./- --psm 7 --oem 3', padding=10):
         """
         Function for extracting text given a text area and a image.
         
@@ -39,15 +39,20 @@ class ReadText:
         x3, y3 = box[2]
         x4, y4 = box[3]
 
-        # Find the angle of rotation
-        angle = -np.arctan2(y1 - y2, x1 - x2) * 180 / np.pi
+         # Find the minimum area rectangle enclosing the text region
+        rect = cv2.minAreaRect(np.array([(x1, y1), (x2, y2), (x3, y3), (x4, y4)], dtype=np.float32))
 
-        # Get the center point of the text region
-        center = np.mean([(x1, y1), (x2, y2), (x3, y3), (x4, y4)], axis=0)
+        # Get the angle of rotation
+        angle = rect[2]
+        #if angle < -45:
+        #    angle += 90
 
         # Create the rotation matrix and apply it
-        rot_mat = cv2.getRotationMatrix2D(tuple(center), angle, 1)
-        rotated_image = cv2.warpAffine(image, rot_mat, (image.shape[1], image.shape[0]))
+        center = rect[0]
+        rot_mat = cv2.getRotationMatrix2D(center, angle, 1)
+        rotated_image = image #cv2.warpAffine(image, rot_mat, (image.shape[1], image.shape[0]))
+        
+        #cv2.imshow("rotated_image?", rotated_image)
         
         xmin = min(x1, x2, x3, x4)
         xmax = max(x1, x2, x3, x4)
@@ -70,7 +75,17 @@ class ReadText:
         
         if ymax - ymin > xmax - xmin:
             cropped_image = cv2.rotate(cropped_image, cv2.ROTATE_90_CLOCKWISE)
+        
+        
+        if Check_color: 
+            #checking the color of the background    
+            pixel_value = rotated_image[int(ymax*0.9), int(xmax/2)]
 
+            # Print the pixel value
+            print('Pixel value at ({}, {}): {}'.format(int(ymax*0.9), int(xmax/2), pixel_value))
+        
+        #cv2.imshow("cropped image?", cropped_image)
+        
         # Convert to grayscale
         if len(image > 2):
             gray = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY)
@@ -79,8 +94,49 @@ class ReadText:
         scale_factor = 3
         resized_image = cv2.resize(gray, (gray.shape[1] * scale_factor, gray.shape[0] * scale_factor), interpolation=cv2.INTER_LANCZOS4)
 
-        # Otsu thresholding for a more dynamic thresholding
-        _, thresh = cv2.threshold(resized_image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        #cv2.imshow("resise", resized_image)
+
+
+        
+        # Get the dimensions of the image
+        h, w = resized_image.shape[:2]
+
+        # Define the percentage values for cropping
+        cropping_precentage = 0.1
+
+        # Calculate the number of pixels to crop from each side
+        left_to_right = int(w * cropping_precentage)
+        top_to_bottom = int(h * cropping_precentage)
+        
+
+        # Crop the image to get rid of background noise, we only want to look at the text color and background color 
+        text_check = resized_image[top_to_bottom:h-top_to_bottom, left_to_right:w-left_to_right]
+        
+        cv2.imshow("crop", text_check)
+        
+        # Find the maximum and minimum pixel values
+        max_pixel_value = np.max(text_check)
+        min_pixel_value = np.min(text_check)
+
+        # Calculate the mean pixel value
+        mean_pixel_value = cv2.mean(text_check)[0]
+        
+        #print(mean_pixel_value)
+        
+        #print("This is the max and min pix val, max: ", max_pixel_value,"min: ", min_pixel_value)
+
+        # Set the thresholding method based on the maximum, minimum, and mean pixel values
+        # used to find out what the text color and thresholds acordingly 
+        if (max_pixel_value - min_pixel_value > 100) and (min_pixel_value < 20):
+            # If the range of pixel values is small, use the mean to determine the thresholding method
+            if mean_pixel_value > 60:
+                _, thresh = cv2.threshold(resized_image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+            else:
+                _, thresh = cv2.threshold(resized_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        else:
+             _, thresh = cv2.threshold(resized_image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+
         
         kernel = np.ones((3, 3), np.uint8)  # Increase the kernel size
         eroded_image = cv2.erode(thresh, kernel, iterations=1)
@@ -88,6 +144,8 @@ class ReadText:
         
         # Remove edge blobs
         segmented = self._remove_edge_blobs(dilated_image)
+        
+        segmented = cv2.bitwise_not(segmented)
         
         # Display the process
         if display:
