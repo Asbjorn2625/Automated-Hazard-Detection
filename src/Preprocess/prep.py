@@ -64,7 +64,7 @@ class PreProcess:
         best_plane_normal_vector = None
         for i in range(max_planes):
             # Apply RANSAC to segment planes from the point cloud.
-            plane_model, inliers = point_cloud.segment_plane(distance_threshold=0.01, ransac_n=5, num_iterations=5000)
+            plane_model, inliers = point_cloud.segment_plane(distance_threshold=0.005, ransac_n=5, num_iterations=10000)
 
             # Calculate the normalized normal vector from the plane
             normal_vector = plane_model[:3] / np.linalg.norm(plane_model[:3])
@@ -99,7 +99,7 @@ class PreProcess:
                 best_plane_normal_vector = point_cloud.select_by_index(inliers, invert=True)
         # In case there is nothing to be found
         if best_plane_inliers is None:
-            return np.zeros_like(img), None
+            return (np.zeros_like(img), None) if mask is None else (np.zeros_like(img), None, np.zeros_like(mask))
         # Extract the best ones
         plane_points = best_plane_inliers
         point_cloud = best_plane_normal_vector
@@ -264,9 +264,9 @@ class PreProcess:
         start_y = (rgb_background.shape[0] - transformed_image.shape[0]) // 2
         start_x = (rgb_background.shape[1] - transformed_image.shape[1]) // 2
         
-        print("Original image dimensions:", rgb_image.shape)
-        print("Transformed image dimensions:", transformed_image.shape)
-        print("Start coordinates (y, x):", start_y, start_x)
+        if transformed_image.shape[0] > rgb_background.shape[0] or transformed_image.shape[1] > rgb_background.shape[1]:
+            # The transformed image is larger than the background
+            return rgb_image, np.eye(3) if mask is None else (rgb_image, np.eye(3), mask)
         
         # Put the transformed image in the center of the black background
         rgb_background[start_y:start_y+transformed_image.shape[0], start_x:start_x+transformed_image.shape[1]] = transformed_image
