@@ -1,6 +1,6 @@
-# ignore ALL files in ANY directory named images
+# ignore ALL files in ANY directory named images and runs
 images/*/
-
+runs/*/
 
 # ignore trained images
 *.pb

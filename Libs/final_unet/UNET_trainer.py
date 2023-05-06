@@ -289,6 +289,7 @@ class UNETTrainer:
             depth = np.fromfile(depth_file, dtype=np.uint16)
             # Reconstruct the depth map
             depth = depth.reshape(1080, 1920)
+            depth = cv2.medianBlur(depth, 5)
             # load the images
             mask = cv2.imread(os.path.join(train_folders[0], mask_file), cv2.IMREAD_GRAYSCALE)
             rgb = cv2.imread(os.path.join(train_folders[1], rgb_file))
@@ -315,6 +316,8 @@ class UNETTrainer:
             depth = np.fromfile(depth_file, dtype=np.uint16)
             # Reconstruct the depth map
             depth = depth.reshape(int(1080), int(1920))
+            # Blue the depth image
+            depth = cv2.medianBlur(depth, 5)
             # load the images
             mask = cv2.imread(os.path.join(test_folders[0], mask_file), cv2.IMREAD_GRAYSCALE)
             rgb = cv2.imread(os.path.join(test_folders[1], rgb_file))
