@@ -6,8 +6,8 @@ import cv2
 import torch.utils
 import sys
 import os
-sys.path.append(os.getcwd().replace("\\", "/") + "/Libs")
-from Initial_unet.utils.model import UNET
+sys.path.append("/workspaces/P6-Automated-Hazard-Detection")
+from Libs.final_unet.utils.model import UNET
 
 class Segmentation:
     def __init__(self):
@@ -20,31 +20,32 @@ class Segmentation:
         self.Lithiummodel= None
         self._load_models()
 
-    def _load_models(self):
+    def _load_models(self, model_type="Dice_Loss"):
             # Load all the model and set it to evaluation mode
+            dir_folder = os.path.dirname(os.path.abspath(__file__))
             #First up is the Hazard model
             self.Hazardmodel = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.DEVICE)
-            self.Hazardmodel.load_state_dict(torch.load("Models/TrainingModel.pth")["state_dict"])
+            self.Hazardmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_hazard{model_type}.pth"))["state_dict"])
             self.Hazardmodel.eval()
             #Next up is the UN model
             self.UNmodel = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.DEVICE)
-            self.UNmodel.load_state_dict(torch.load("Models/TrainingModelUN.pth")["state_dict"])
+            self.UNmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_hazard{model_type}.pth"))["state_dict"]) # Come back when it's trained
             self.UNmodel.eval()
             #CAO model
             self.CAOmodel = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.DEVICE)
-            self.CAOmodel.load_state_dict(torch.load("Models/TrainingModelCAO.pth")["state_dict"])
+            self.CAOmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_CAO{model_type}.pth"))["state_dict"])
             self.CAOmodel.eval()
             #Proper shipping NAme
             self.PSmodel = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.DEVICE)
-            self.PSmodel.load_state_dict(torch.load("Models/TrainingModelPS.pth")["state_dict"])
+            self.PSmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_hazard{model_type}.pth"))["state_dict"]) # Come back when it's trained
             self.PSmodel.eval()
             #this side up
             self.TSUmodel = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.DEVICE)
-            self.TSUmodel.load_state_dict(torch.load("Models/TrainingModelTSU.pth")["state_dict"])
+            self.TSUmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_hazard{model_type}.pth"))["state_dict"]) # Come back when it's trained
             self.TSUmodel.eval()
             #Lithium
             self.Lithiummodel = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.DEVICE)
-            self.Lithiummodel.load_state_dict(torch.load("Models/TrainingModelLithium.pth")["state_dict"])
+            self.Lithiummodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_Lithium{model_type}.pth"))["state_dict"])
             self.Lithiummodel.eval()
             print("Models loaded")
             
