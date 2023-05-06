@@ -272,7 +272,7 @@ class PreProcess:
         rgb_background[start_y:start_y+transformed_image.shape[0], start_x:start_x+transformed_image.shape[1]] = transformed_image
 
         if mask is None:
-            return transformed_image, homography_matrix
+            return rgb_background, homography_matrix
         # Transform the mask if it is provided    
         transformed_mask = cv2.warpPerspective(mask, homography_matrix, (width, height))
         
@@ -280,5 +280,5 @@ class PreProcess:
         mask_background = np.zeros_like(mask)
         mask_background[start_y:start_y+transformed_mask.shape[0], start_x:start_x+transformed_mask.shape[1]] = transformed_mask
         
-        return transformed_image, homography_matrix, transformed_mask
+        return rgb_background, homography_matrix, mask_background
         

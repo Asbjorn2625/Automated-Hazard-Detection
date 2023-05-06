@@ -289,6 +289,9 @@ class UNETTrainer:
             depth = np.fromfile(depth_file, dtype=np.uint16)
             # Reconstruct the depth map
             depth = depth.reshape(1080, 1920)
+            # Blur the depth map
+            depth_blurred = cv2.medianBlur(depth, 5)
+            
             # load the images
             mask = cv2.imread(os.path.join(train_folders[0], mask_file), cv2.IMREAD_GRAYSCALE)
             rgb = cv2.imread(os.path.join(train_folders[1], rgb_file))
@@ -296,10 +299,10 @@ class UNETTrainer:
             # undistort the image
             rgb = pp.undistort_images(rgb)
             mask = pp.undistort_images(mask)
-            depth = pp.undistort_images(depth)
+            depth_blurred = pp.undistort_images(depth_blurred)
             
             # Warp the images
-            trans_img, _, trans_mask = pp.retrieve_transformed_plane(rgb, depth, mask=mask)
+            trans_img, _, trans_mask = pp.retrieve_transformed_plane(rgb, depth_blurred, mask=mask)
             
             if np.any(trans_mask != 0):
                 # Save the images
@@ -315,6 +318,9 @@ class UNETTrainer:
             depth = np.fromfile(depth_file, dtype=np.uint16)
             # Reconstruct the depth map
             depth = depth.reshape(int(1080), int(1920))
+            # Blur the depth map
+            depth_blurred = cv2.medianBlur(depth, 5)
+            
             # load the images
             mask = cv2.imread(os.path.join(test_folders[0], mask_file), cv2.IMREAD_GRAYSCALE)
             rgb = cv2.imread(os.path.join(test_folders[1], rgb_file))
@@ -322,10 +328,10 @@ class UNETTrainer:
             # undistort the image
             rgb = pp.undistort_images(rgb)
             mask = pp.undistort_images(mask)
-            depth = pp.undistort_images(depth)
+            depth_blurred = pp.undistort_images(depth_blurred)
             
             # Warp the images
-            trans_img, _, trans_mask = pp.retrieve_transformed_plane(rgb, depth, mask=mask)
+            trans_img, _, trans_mask = pp.retrieve_transformed_plane(rgb, depth_blurred, mask=mask)
 
             if np.any(trans_mask != 0):
                 # Save the images
