@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 from tqdm import tqdm
+import pandas as pd
 
 class ImageFetcher:
     def __init__(self, path):
@@ -78,6 +79,39 @@ class ImageFetcher:
             rgb = cv2.imread(imgpath.replace("depth","rgb").replace("raw","png"))
             lib[filename] = rgb, img
         return lib
+    
+    
+    def alterate_set(self, path2excl):
+        """[summary]
+        Returns a dataframe with the images and the corresponding labels.
+        """
+        excl = pd.read_csv(path2excl)
+
+        # Add a new column "filenames" to the existing DataFrame
+        excl['filenames'] = None
+
+        # Fetching the images
+        imglib = self.get_rgb_depth_images()
+
+        # Group the filenames into sets of four
+        filenames_list = list(imglib.keys())
+        grouped_filenames = [filenames_list[i:i + 4] for i in range(0, len(filenames_list), 4)]
+
+        for index, row in excl.iterrows():
+            # Fetch the image filenames related to the current row based on the chronological order
+            try:
+                filenames = grouped_filenames[index]
+            except IndexError:
+                print(f"No more sets of 4 images available for row {index}")
+                continue
+
+            # Update the "filenames" column in the DataFrame with the list of filenames
+            excl.at[index, 'filenames'] = filenames
+        return excl
+    
+image_processor = ImageFetcher(os.getcwd() + "/images")
+excl = image_processor.alterate_set(os.getcwd() + "/Dangerous_goods_list_for_testing.csv")
+print(excl)
             
             
             

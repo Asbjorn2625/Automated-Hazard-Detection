@@ -10,15 +10,15 @@ sys.path.append("/workspaces/P6-Automated-Hazard-Detection")
 from Libs.final_unet.utils.model import UNET
 
 class Segmentation:
-    def __init__(self):
-        self.DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+    def __init__(self,model_type="Dice_Loss", DEVICE="cuda" if torch.cuda.is_available() else "cpu"):
+        self.DEVICE = DEVICE
         self.Hazardmodel= None
         self.UNmodel= None
         self.CAOmodel= None
         self.PSmodel= None
         self.TSUmodel= None
         self.Lithiummodel= None
-        self._load_models()
+        self._load_models(model_type=model_type)
 
     def _load_models(self, model_type="Dice_Loss"):
             # Load all the model and set it to evaluation mode
@@ -29,7 +29,7 @@ class Segmentation:
             self.Hazardmodel.eval()
             #Next up is the UN model
             self.UNmodel = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.DEVICE)
-            self.UNmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_hazard{model_type}.pth"))["state_dict"]) # Come back when it's trained
+            self.UNmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_UN_circle{model_type}.pth"))["state_dict"])
             self.UNmodel.eval()
             #CAO model
             self.CAOmodel = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.DEVICE)
@@ -37,11 +37,11 @@ class Segmentation:
             self.CAOmodel.eval()
             #Proper shipping NAme
             self.PSmodel = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.DEVICE)
-            self.PSmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_hazard{model_type}.pth"))["state_dict"]) # Come back when it's trained
+            self.PSmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_Shipping{model_type}.pth"))["state_dict"])
             self.PSmodel.eval()
             #this side up
             self.TSUmodel = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.DEVICE)
-            self.TSUmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_hazard{model_type}.pth"))["state_dict"]) # Come back when it's trained
+            self.TSUmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_this_side_up{model_type}.pth"))["state_dict"]) 
             self.TSUmodel.eval()
             #Lithium
             self.Lithiummodel = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.DEVICE)
@@ -56,9 +56,9 @@ class Segmentation:
         assert image_np.dtype == np.uint8, "Input array must have dtype 'uint8'"
         assert model != None, "Model not loaded"
         transform = T.Compose([
-            T.Resize((562, 562), antialias=True),
+            T.Resize((out_y, out_x), antialias=True),
             T.ToTensor(),
-            T.Normalize(mean=[0.0, 0.0, 0.0], std=[1.0, 1.0, 1.0])
+            T.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225],)
         ])
         # Convert the BGR NumPy array to RGB
         image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
