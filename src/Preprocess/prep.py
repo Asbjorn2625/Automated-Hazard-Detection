@@ -64,7 +64,7 @@ class PreProcess:
         best_plane_normal_vector = None
         for i in range(max_planes):
             # Apply RANSAC to segment planes from the point cloud.
-            plane_model, inliers = point_cloud.segment_plane(distance_threshold=0.005, ransac_n=5, num_iterations=10000)
+            plane_model, inliers = point_cloud.segment_plane(distance_threshold=0.008, ransac_n=5, num_iterations=10000)
 
             # Calculate the normalized normal vector from the plane
             normal_vector = plane_model[:3] / np.linalg.norm(plane_model[:3])
@@ -122,7 +122,7 @@ class PreProcess:
         # Remove noise
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9,9))
         eroded = cv2.erode(cv2.cvtColor(plane_mask, cv2.COLOR_RGB2GRAY), kernel, iterations=3)
-        dilated = cv2.dilate(eroded, kernel, iterations=5)
+        dilated = cv2.dilate(eroded, kernel, iterations=7)
         # Get the convex hull
         contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         largest_contour = max(contours, key=cv2.contourArea)
