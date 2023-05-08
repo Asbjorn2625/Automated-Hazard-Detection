@@ -56,9 +56,9 @@ class Segmentation:
         assert image_np.dtype == np.uint8, "Input array must have dtype 'uint8'"
         assert model != None, "Model not loaded"
         transform = T.Compose([
-            T.Resize((562, 562), antialias=True),
+            T.Resize((out_y, out_x), antialias=True),
             T.ToTensor(),
-            T.Normalize(mean=[0.0, 0.0, 0.0], std=[1.0, 1.0, 1.0])
+            T.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225],)
         ])
         # Convert the BGR NumPy array to RGB
         image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
