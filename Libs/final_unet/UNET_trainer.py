@@ -11,20 +11,21 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import StepLR
-from utils.model import UNET
-from utils.utils import (
+from sklearn.model_selection import train_test_split
+# Get the preprocessing functions
+import sys
+sys.path.append('/workspaces/P6-Automated-Hazard-Detection')
+sys.path.append('/workspaces/Automated-Hazard-Detection')
+from src.Preprocess.prep import PreProcess
+from Libs.final_unet.utils.model import UNET
+from Libs.final_unet.utils.lossModels import DiceLoss
+from Libs.final_unet.utils.utils import (
     load_checkpoint,
     save_checkpoint,
     get_loaders,
     check_accuracy,
     save_predictions_as_imgs,
 )
-from sklearn.model_selection import train_test_split
-from utils.lossModels import DiceLoss, CombinedLoss, FocalLoss
-# Get the preprocessing functions
-import sys
-sys.path.append('/workspaces/P6-Automated-Hazard-Detection')
-from src.Preprocess.prep import PreProcess
 
 
 class UNETTrainer:
@@ -56,6 +57,7 @@ class UNETTrainer:
 
             mask_list = self._merge_masks(mask_folder, mask_list)
             rgb_list = self._onlyTruths(rgb_list, mask_list)
+            print(len(rgb_list), len(mask_list))
             train_folders, test_folders = self._split_images(base_folder, rgb_folder, mask_folder, rgb_list, mask_list)
             # Preprocess the images
             self._preprocess_images(train_folders, test_folders, rgb_folder)
@@ -290,7 +292,7 @@ class UNETTrainer:
             # Reconstruct the depth map
             depth = depth.reshape(1080, 1920)
             # Blur the depth map
-            depth_blurred = cv2.medianBlur(depth, 5)
+            #depth_blurred = cv2.medianBlur(depth, 5)
             
             # load the images
             mask = cv2.imread(os.path.join(train_folders[0], mask_file), cv2.IMREAD_GRAYSCALE)
@@ -299,10 +301,10 @@ class UNETTrainer:
             # undistort the image
             rgb = pp.undistort_images(rgb)
             mask = pp.undistort_images(mask)
-            depth_blurred = pp.undistort_images(depth_blurred)
+            depth = pp.undistort_images(depth)
             
             # Warp the images
-            trans_img, _, trans_mask = pp.retrieve_transformed_plane(rgb, depth_blurred, mask=mask)
+            trans_img, _, trans_mask = pp.retrieve_transformed_plane(rgb, depth, mask=mask)
             
             if np.any(trans_mask != 0):
                 # Save the images
@@ -319,7 +321,7 @@ class UNETTrainer:
             # Reconstruct the depth map
             depth = depth.reshape(int(1080), int(1920))
             # Blur the depth map
-            depth_blurred = cv2.medianBlur(depth, 5)
+            #depth_blurred = cv2.medianBlur(depth, 5)
             
             # load the images
             mask = cv2.imread(os.path.join(test_folders[0], mask_file), cv2.IMREAD_GRAYSCALE)
@@ -328,10 +330,10 @@ class UNETTrainer:
             # undistort the image
             rgb = pp.undistort_images(rgb)
             mask = pp.undistort_images(mask)
-            depth_blurred = pp.undistort_images(depth_blurred)
+            depth = pp.undistort_images(depth)
             
             # Warp the images
-            trans_img, _, trans_mask = pp.retrieve_transformed_plane(rgb, depth_blurred, mask=mask)
+            trans_img, _, trans_mask = pp.retrieve_transformed_plane(rgb, depth, mask=mask)
 
             if np.any(trans_mask != 0):
                 # Save the images

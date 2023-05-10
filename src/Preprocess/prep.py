@@ -64,7 +64,7 @@ class PreProcess:
         best_plane_normal_vector = None
         for i in range(max_planes):
             # Apply RANSAC to segment planes from the point cloud.
-            plane_model, inliers = point_cloud.segment_plane(distance_threshold=0.008, ransac_n=5, num_iterations=10000)
+            plane_model, inliers = point_cloud.segment_plane(distance_threshold=0.005, ransac_n=8, num_iterations=10000)
 
             # Calculate the normalized normal vector from the plane
             normal_vector = plane_model[:3] / np.linalg.norm(plane_model[:3])
@@ -122,7 +122,7 @@ class PreProcess:
         # Remove noise
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9,9))
         eroded = cv2.erode(cv2.cvtColor(plane_mask, cv2.COLOR_RGB2GRAY), kernel, iterations=3)
-        dilated = cv2.dilate(eroded, kernel, iterations=7)
+        dilated = cv2.dilate(eroded, kernel, iterations=5)
         # Get the convex hull
         contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         largest_contour = max(contours, key=cv2.contourArea)
@@ -266,7 +266,7 @@ class PreProcess:
         
         if transformed_image.shape[0] > rgb_background.shape[0] or transformed_image.shape[1] > rgb_background.shape[1]:
             # The transformed image is larger than the background
-            return rgb_image, np.eye(3) if mask is None else (rgb_image, np.eye(3), mask)
+            return (rgb_image, np.eye(3)) if mask is None else (rgb_image, np.eye(3), mask)
         
         # Put the transformed image in the center of the black background
         rgb_background[start_y:start_y+transformed_image.shape[0], start_x:start_x+transformed_image.shape[1]] = transformed_image
