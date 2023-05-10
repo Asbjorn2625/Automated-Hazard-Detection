@@ -14,6 +14,18 @@ class DiceLoss(nn.Module):
         dice_coeff = num / den
         return 1 - dice_coeff.mean()
 
+class IoULoss(nn.Module):
+    def __init__(self, eps=1e-7):
+        super(IoULoss, self).__init__()
+        self.eps = eps
+
+    def forward(self, logits, targets):
+        probs = torch.sigmoid(logits)
+        num = (probs * targets).sum(dim=(1, 2, 3)) + self.eps
+        den = (probs + targets).sum(dim=(1, 2, 3)) - num + self.eps
+        iou = num / den
+        return 1 - iou.mean()
+
 class CombinedLoss(nn.Module):
     def __init__(self, alpha=0.5):
         super(CombinedLoss, self).__init__()

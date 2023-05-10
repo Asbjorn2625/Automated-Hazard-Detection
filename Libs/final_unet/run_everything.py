@@ -1,5 +1,6 @@
 from UNET_trainer import  *
-from utils.lossModels import DiceLoss, CombinedLoss, FocalLoss
+from utils.lossModels import DiceLoss, CombinedLoss, FocalLoss, IoULoss
+import torch.nn as nn
 import os
 
 mask_types = ["hazard", "Lithium", "Shipping", "this_side_up", "UN_circle"]
@@ -20,18 +21,30 @@ if __name__ == "__main__":
         print(f"Training {model_name}")
         # Go through the different models and save them individually
         trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=4,
-                              batch_size=2, model_name=model_name+"Dice_loss"+".pth", NEW_SET=True)
+                              batch_size=4, model_name=model_name+"FocalLoss"+".pth", loss_model=FocalLoss(),
+                              NEW_SET=True)
         trainer.train()
         
         trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=4,
-                              batch_size=2, model_name=model_name+"CombinedLoss"+".pth", loss_model=CombinedLoss(),
+                              batch_size=4, model_name=model_name+"Dice_loss"+".pth", NEW_SET=False)
+        trainer.train()
+        
+        trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=4,
+                              batch_size=4, model_name=model_name+"IoU"+".pth", loss_model=IoULoss(),
                               NEW_SET=False)
         trainer.train()
         
-        #trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=0,
-        #                      batch_size=2, model_name=model_name+"FocalLoss"+".pth", loss_model=FocalLoss(),
-        #                      NEW_SET=False)
-       # trainer.train()
+        trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=4,
+                              batch_size=4, model_name=model_name+"CrossEntropy"+".pth", loss_model=nn.CrossEntropyLoss(),
+                              NEW_SET=False)
+        trainer.train()
+        
+        trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=4,
+                              batch_size=4, model_name=model_name+"CombinedLoss"+".pth", loss_model=CombinedLoss(),
+                              NEW_SET=False)
+        trainer.train()
+        
+        
         
         # Might try without augmentation later
 
