@@ -1,9 +1,10 @@
 from UNET_trainer import  *
-from utils.lossModels import DiceLoss, CombinedLoss, FocalLoss, IoULoss
+from utils.lossModels import CombinedLoss, IoULoss
 import torch.nn as nn
 import os
 
-mask_types = ["hazard", "Lithium", "Shipping", "this_side_up", "UN_circle"]
+#mask_types = ["CAO", "hazard", "Lithium", "Shipping", "this_side_up", "UN_circle"]
+mask_types = ["UN_circle"]
 folder_name = "rgb_depth"
 
 if __name__ == "__main__":
@@ -20,27 +21,22 @@ if __name__ == "__main__":
         model_name = f"UNET_{type}"
         print(f"Training {model_name}")
         # Go through the different models and save them individually
-        trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=4,
-                              batch_size=4, model_name=model_name+"FocalLoss"+".pth", loss_model=FocalLoss(),
-                              NEW_SET=True)
+        trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=6,
+                              batch_size=2, model_name=model_name+"Dice_loss"+".pth", NEW_SET=True)
         trainer.train()
         
-        trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=4,
-                              batch_size=4, model_name=model_name+"Dice_loss"+".pth", NEW_SET=False)
-        trainer.train()
-        
-        trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=4,
-                              batch_size=4, model_name=model_name+"IoU"+".pth", loss_model=IoULoss(),
+        trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=6,
+                              batch_size=2, model_name=model_name+"IoU"+".pth", loss_model=IoULoss(),
                               NEW_SET=False)
         trainer.train()
         
-        trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=4,
-                              batch_size=4, model_name=model_name+"CrossEntropy"+".pth", loss_model=nn.CrossEntropyLoss(),
+        trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=6,
+                              batch_size=2, model_name=model_name+"CrossEntropy"+".pth", loss_model=nn.BCEWithLogitsLoss(),
                               NEW_SET=False)
         trainer.train()
         
-        trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=4,
-                              batch_size=4, model_name=model_name+"CombinedLoss"+".pth", loss_model=CombinedLoss(),
+        trainer = UNETTrainer(base_folder, rgb_folder, mask_folder, worker_threads=6,
+                              batch_size=2, model_name=model_name+"CombinedLoss"+".pth", loss_model=CombinedLoss(),
                               NEW_SET=False)
         trainer.train()
         

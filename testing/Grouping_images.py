@@ -38,15 +38,3 @@ def alterate_set(path2imgs, path2excl):
 
 list=alterate_set((os.getcwd() + "/images"), (os.getcwd() + "/Dangerous_goods_list_for_testing.csv"))
 print(list.loc[0])
-
-
-
-
-
-        
-           
-    
-    
-
-
-
