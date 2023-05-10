@@ -109,9 +109,7 @@ class ImageFetcher:
             excl.at[index, 'filenames'] = filenames
         return excl
     
-image_processor = ImageFetcher(os.getcwd() + "/images")
-excl = image_processor.alterate_set(os.getcwd() + "/Dangerous_goods_list_for_testing.csv")
-print(excl)
+
             
             
             

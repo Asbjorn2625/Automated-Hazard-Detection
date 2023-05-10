@@ -51,6 +51,9 @@ rgb_images = [f'./testing/Final_reading_test/{img}' for img in os.listdir("./tes
 
 csv_file_path = "/workspaces/Automated-Hazard-Detection/testing/color_test.csv"
 
+
+csv_file_path_output = "/workspaces/Automated-Hazard-Detection/testing/reading_test_output.csv"
+
 # Create a list to store the label strings for each image
 label_list = []
 
@@ -71,7 +74,19 @@ df = pd.read_csv(csv_file_path)
 my_dict = df.to_dict('list')
 
 #print the dictionary
-#print(my_dict)    
+#print(my_dict)  
+
+output_list = []  
+
+
+succesful_black = 0
+succesful_red = 0
+succesful_yellow = 0
+succesful_brown = 0
+succesful_white = 0
+succesful_blue = 0
+succesful_orange = 0
+
 
 # Loop through the images
 for image_path in rgb_images:
@@ -102,6 +117,10 @@ for image_path in rgb_images:
     
     trans_img, homography = pp.retrieve_transformed_plane(original_img, depth_blurred)
 
+    
+    
+    
+    
     #preds =  segment.locateHazard(trans_img)
     
     #Roi = pp.segmentation_to_ROI(preds)
@@ -122,8 +141,7 @@ for image_path in rgb_images:
     current_orientation = [0,170,160,150,140,135,10,20,30,40,45] 
     
     image_filename = os.path.basename(image_path)
-    
-    
+
     # Remove the file extension from the filename
     image_filename_without_extension = os.path.splitext(image_filename)[0]
     
@@ -139,10 +157,10 @@ for image_path in rgb_images:
     
     
     
-    #plt.figure(figsize=(10, 5))  # Set the figure size to 10x10 inches
-    #plt.title(image_filename_without_extension)
-    #plt.imshow(cv2.cvtColor(original_img, cv2.COLOR_BGR2RGB))
-    #plt.show()
+    plt.figure(figsize=(10, 5))  # Set the figure size to 10x10 inches
+    plt.title(image_filename_without_extension)
+    plt.imshow(cv2.cvtColor(original_img, cv2.COLOR_BGR2RGB))
+    plt.show()
     
     current_set_df = pd.DataFrame(columns=['picturename', 'size', 'x', 'y', 'orientation', 'text', 'color '])
     
@@ -184,8 +202,7 @@ for image_path in rgb_images:
         text_on_box = text
         real_box = list(map(lambda x: list(pp.transformed_to_original_pixel(x, homography)), box))
         
-        print(text_on_box)
-        
+
         # Extract the bounding area
         x1, y1 = real_box[0]
         x2, y2 = real_box[1]
@@ -201,7 +218,9 @@ for image_path in rgb_images:
         
         biggest_point = [xmax, ymax]
         
-        
+        print(smallest_point, biggest_point)
+        print(positions)
+
     
         
         for pos, (x, y) in enumerate(positions):
@@ -210,17 +229,67 @@ for image_path in rgb_images:
                 #print("New_picture: ", picturename, text, current_set_df.loc[pos, "color"], orientation_value, size_value)
                 the_color = current_set_df.loc[pos, "color"]
                 print(the_color)
+
+                csv_output_string = f"{image_filename_without_extension},{size_value},{orientation_value},{the_color},{text_on_box},4G/Y30/S/22/D/BAM "
                 
-                if text_on_box == "4G/Y30/S/22/D/BAM": #remember to change 0 to D
+                output_list.append(csv_output_string)
+    #print(csv_output_string)      
+    print(output_list)
+
+    i = i + 1 
+   
+# Open the CSV file in append mode
+with open(csv_file_path, mode_output='a', newline='') as file:
+    writer = csv.writer(file)
+
+    # Write the data using a for loop
+    for row in output_list:
+        writer.writerow(row)
+
+print("CSV file updated successfully.")
+
+
+
+                
+"""                if text_on_box == "4G/Y30/S/22/D/BAM": #remember to change 0 to D
                     print("I read good")
                 if the_color == "  yellow":
                     print("im yellow")    
                 
                 #label = f" {picturename},  {size_value},  {x}, {y},  {orientation_value}, 4G/Y30/S/22/D/BAM, {the_color}"
                 if text_on_box == "4G/Y30/S/22/D/BAM" and  the_color.value == "  yellow":
+                    successful_yellow += 1
+                    print("hello")
+                    
+                if text_on_box == "4G/Y30/S/22/D/BAM" and  the_color.value == "  brown":
+                    successful_brown += 1
+                    print("hello")    
+                    
+                if text_on_box == "4G/Y30/S/22/D/BAM" and  the_color.value == "  red":
+                    yellow = yellow + 1
+                    print("hello") 
+                    
+                    
+                    
+                if text_on_box == "4G/Y30/S/22/D/BAM" and  the_color.value == "  blue":
+                    yellow = yellow + 1
+                    print("hello") 
+                    
+                    
+                if text_on_box == "4G/Y30/S/22/D/BAM" and  the_color.value == "  green":
                     yellow = yellow + 1
                     print("hello")
                     
+                    
+                if text_on_box == "4G/Y30/S/22/D/BAM" and  the_color.value == "  black":
+                    yellow = yellow + 1
+                    print("hello") 
+                    
+                    
+                if text_on_box == "4G/Y30/S/22/D/BAM" and  the_color.value == "  white":
+                    yellow = yellow + 1
+                    print("hello")          
+                    """
                 
 
         
@@ -239,11 +308,7 @@ for image_path in rgb_images:
     
 
       
-    i = i + 1 
-   
-# Create scatter plot using the label list
-for label in label_list:
-    print(label)
+
 
     
 
