@@ -1,69 +1,28 @@
+import pyrealsense2 as rs
 import numpy as np
-import cv2
-import os
 
+# Create a context object to manage the connection to the device
+ctx = rs.context()
+if len(ctx.devices) == 0:
+    print("No RealSense devices were found")
+    exit(1)
 
-def resize_image(image, image_name, procent):
-    [height, width] = [image.shape[0],image.shape[1]]
-    [height, width] = [procent*height, procent*width]
-    cv2.namedWindow(image_name, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(image_name, int(width), int(height))
-    cv2.imshow(image_name, image)
+# Get the first connected device
+dev = ctx.devices[0]
 
+# Get the depth sensor and depth stream profile
+color_sensor = dev.first_color_sensor()
+depth_stream_profile = color_sensor.get_stream_profiles()[0].as_video_stream_profile()
 
-# Define the size of the checkerboard
-checkerboard_size = (8, 6)
-square_size = 40 # in mm
+# Get the intrinsic values
+intrinsics = depth_stream_profile.get_intrinsics()
 
-# Generate the object points
-objp = np.zeros((np.prod(checkerboard_size), 3), np.float32)
-objp[:, :2] = np.mgrid[0:checkerboard_size[0], 0:checkerboard_size[1]].T.reshape(-1, 2)
-objp *= square_size
+# Create a camera matrix (mtx) and distortion coefficients (dist) from intrinsics
+mtx = np.array([[intrinsics.fx, 0, intrinsics.ppx],
+                [0, intrinsics.fy, intrinsics.ppy],
+                [0, 0, 1]])
 
-# Initialize lists to store object points and image points for all images
-objpoints = []
-imgpoints = []
+dist = np.array([intrinsics.coeffs])
 
-# Create list of image filenames
-image_names = [f'./Callibration images/{img}' for img in os.listdir("./Callibration images")]
-# Loop through the,
-for image in image_names:
-    # Load the image
-    img = cv2.imread(image)
-
-    # Convert to grayscale
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # Find the corners of the checkerboard
-    ret, corners = cv2.findChessboardCorners(gray, checkerboard_size, None)
-
-    # If the corners were found, refine the corner locations
-    if ret:
-        #           Criteria,                                 , iterations, accuracy
-        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 60, 0.0001)
-        corners = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
-
-        cv2.drawChessboardCorners(img, checkerboard_size, corners, ret)
-
-        resize_image(img, "result", 0.4)
-        cv2.waitKey(5)  # Change if the corner detection has to be examined
-
-        # Add the object and image points to the lists
-        objpoints.append(objp)
-        imgpoints.append(corners)
-
-# Calibrate the camera
-ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
-
-# Display the result
-for image in image_names[-5:]:
-    img = cv2.imread(image)
-    # Undistort an image
-    img_undistorted = cv2.undistort(img, mtx, dist)
-
-    resize_image(img_undistorted, "result", 0.4)
-    cv2.waitKey(0)
-
-# Save the result
+# Save the camera matrix and distortion coefficients to a file
 np.savez('calibration.npz', mtx=mtx, dist=dist)
-
