@@ -156,18 +156,51 @@ class PreProcess:
             return output_image, homography_matrix, output_mask
         
       
-    def transformed_to_original_pixel(self, transformed_pixel, homography_matrix):
+    def transformed_to_original_pixel(self, image, transformed_pixel, homography_matrix):
         """
         Convert pixel coordinates in the transformed image back to the original image.
+        :param: image: np.ndarray, the original image
         :param transformed_pixel: tuple or np.ndarray, (x, y) coordinates in the transformed image
         :param homography_matrix: np.ndarray, the homography matrix used to transform the original image
         :return: np.ndarray, (x, y) coordinates in the original image
         """
+        # Remove the black box
+        new_x, new_y = self._remove_black_box(image, transformed_pixel[0], transformed_pixel[1])
+        transformed_pixel = np.array([new_x, new_y])
+        # Get the pixel value in the original image
         transformed_pixel = np.array([*transformed_pixel, 1])
         original_pixel = np.linalg.inv(homography_matrix) @ transformed_pixel
         original_pixel = original_pixel / original_pixel[2]
         return original_pixel[:2].round().astype(int)
-        
+
+    def _remove_black_box(self, image, original_x, original_y):
+        # Convert the image to grayscale
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Threshold the image (all pixels with intensity > 0 will become white)
+        _, thresh = cv2.threshold(gray, 1, 255, cv2.THRESH_BINARY)
+
+        # Find the contours in the binary image
+        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Find the largest contour (assuming it's the content of the image)
+        max_area = 0
+        best_cnt = None
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area > max_area:
+                max_area = area
+                best_cnt = cnt
+
+        # Find the bounding rectangle of the largest contour
+        x, y, w, h = cv2.boundingRect(best_cnt)
+
+        # Get the new coordinates in the cropped image
+        cropped_x = original_x - x
+        cropped_y = original_y - y
+
+        return cropped_x, cropped_y
+
     def segmentation_to_ROI(self, image):
         grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         ret, thr = cv2.threshold(grey, 0, 200, cv2.THRESH_BINARY)
