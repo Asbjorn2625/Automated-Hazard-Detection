@@ -314,4 +314,18 @@ class PreProcess:
         mask_background[start_y:start_y+transformed_mask.shape[0], start_x:start_x+transformed_mask.shape[1]] = transformed_mask
         
         return rgb_background, homography_matrix, mask_background
+    
+    
+    def get_pixelsize(self, depth):
+        """
+        Calculates the pixel size at a certain distance
+        :param depth: The depth image, as a numpy.ndarray (dtype=np.uint16)
+        :return width: np.ndarray
+        :return height: np.ndarray
+        """
+        fov = np.deg2rad([69, 42])
+        # 2 * depth * tan(FOV / 2) * (object width in pixels / image width in pixels)
+        pixle_width = 2 * depth * np.tan(fov[0]/2)/1920
+        pixle_height = 2 * depth * np.tan(fov[1]/2)/1080
+        return pixle_width, pixle_height
         
