@@ -8,7 +8,7 @@ from Segmentation.segmentation import Segmentation
 from Preprocess.prep import PreProcess
 from Data_acquisition.Image_fetcher import ImageFetcher
 
-image_path = os.path.join(os.getcwd().replace("\\","/") + "/testing/Data_set")
+image_path = os.path.join(os.getcwd().replace("\\","/") + "/testing/labels_on_the_edge")
 
 segment = Segmentation()
 
@@ -32,9 +32,9 @@ for file in imglib:
     
    
     
-   
+    cv2.imshow("image", cropped)
  
-    cv2.imwrite("/workspaces/Automated-Hazard-Detection/testing/Out_cropped_hazard_rgb/image_"+ str(i) + ".png", cropped)
+    #cv2.imwrite("/workspaces/Automated-Hazard-Detection/testing/Out_cropped_hazard_rgb/image_"+ str(i) + ".png", cropped)
     
     
     i = i + 1

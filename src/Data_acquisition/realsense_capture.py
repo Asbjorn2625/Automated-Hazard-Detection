@@ -11,6 +11,10 @@ def resize_image(image, image_name, procent):
     cv2.resizeWindow(image_name, int(width), int(height))
     cv2.imshow(image_name, image)
 
+
+# Folder to save the data in
+os.makedirs("./data", exist_ok=True)
+
 # Create a pipeline
 pipeline = rs.pipeline()
 
@@ -19,7 +23,7 @@ config = rs.config()
 
 # Add the RGB and depth streams to the configuration
 config.enable_stream(rs.stream.color, 1920, 1080, rs.format.bgr8, 15)
-config.enable_stream(rs.stream.depth, int(1280), int(720), rs.format.z16, 15)
+config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 15)
 
 # Start the pipeline
 profile = pipeline.start(config)
@@ -78,7 +82,7 @@ try:
             curr_index += 1
             # Save the RGB image
             cv2.imwrite("data/rgb_image_{:04d}.png".format(curr_index), color_image)
-
+            print("Saved RGB image {:04d}".format(curr_index))
             # Save the depth image
             depth_image.tofile("data/depth_image_{:04d}.raw".format(curr_index))
             

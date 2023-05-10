@@ -19,10 +19,11 @@ class ReadText:
         """
         # Detect text regions
         prediction_result = self.craft.detect_text(img.copy())
+             
         return prediction_result["boxes"]
 
     
-    def readText(self, image, box, display=False, Check_color=False, config='-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./- --psm 7 --oem 3', padding=10):
+    def readText(self, image, box, display=False, config='-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./- --psm 7 --oem 3', padding=10):
         """
         Function for extracting text given a text area and a image.
         
@@ -38,6 +39,8 @@ class ReadText:
         x2, y2 = box[1]
         x3, y3 = box[2]
         x4, y4 = box[3]
+        
+        
 
          # Find the minimum area rectangle enclosing the text region
         rect = cv2.minAreaRect(np.array([(x1, y1), (x2, y2), (x3, y3), (x4, y4)], dtype=np.float32))
@@ -77,12 +80,7 @@ class ReadText:
             cropped_image = cv2.rotate(cropped_image, cv2.ROTATE_90_CLOCKWISE)
         
         
-        if Check_color: 
-            #checking the color of the background    
-            pixel_value = rotated_image[int(ymax*0.9), int(xmax/2)]
 
-            # Print the pixel value
-            print('Pixel value at ({}, {}): {}'.format(int(ymax*0.9), int(xmax/2), pixel_value))
         
         #cv2.imshow("cropped image?", cropped_image)
         
@@ -112,7 +110,7 @@ class ReadText:
         # Crop the image to get rid of background noise, we only want to look at the text color and background color 
         text_check = resized_image[top_to_bottom:h-top_to_bottom, left_to_right:w-left_to_right]
         
-        cv2.imshow("crop", text_check)
+        cv2.imshow("crop", cropped_image)
         
         # Find the maximum and minimum pixel values
         max_pixel_value = np.max(text_check)
