@@ -37,7 +37,7 @@ class UNLabels:
                 Package.append([PackageType, certification, solid])
         return Package
 
-
+""""""
 segsy = Segmentation()
 fetcher = ImageFetcher(os.getcwd().replace("\\", "/") + "/Dataset")
 img_lib = fetcher.get_rgb_depth_images()
