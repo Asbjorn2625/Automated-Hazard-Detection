@@ -64,7 +64,7 @@ class PreProcess:
         best_plane_normal_vector = None
         for i in range(max_planes):
             # Apply RANSAC to segment planes from the point cloud.
-            plane_model, inliers = point_cloud.segment_plane(distance_threshold=0.005, ransac_n=8, num_iterations=10000)
+            plane_model, inliers = point_cloud.segment_plane(distance_threshold=0.008, ransac_n=8, num_iterations=10000)
 
             # Calculate the normalized normal vector from the plane
             normal_vector = plane_model[:3] / np.linalg.norm(plane_model[:3])

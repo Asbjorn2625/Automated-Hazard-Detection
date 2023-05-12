@@ -47,7 +47,7 @@ page_count = 1
 New_set = False
 
 # Create list of image filenames
-rgb_images = [f'./testing/Final_reading_test/{img}' for img in os.listdir("./testing/Final_reading_test") if img.startswith("rgb_image")]
+rgb_images = [f'./testing/Final_reading_test/{img}' for img in os.listdir("./testing/Final_reading_test/") if img.startswith("rgb_image")]
 
 csv_file_path = "/workspaces/Automated-Hazard-Detection/testing/color_test.csv"
 
@@ -86,11 +86,18 @@ succesful_brown = 0
 succesful_white = 0
 succesful_blue = 0
 succesful_orange = 0
+succesful_green = 0
+
+def calc_success_rate(color, color_name):
+    success_rate = color/66
+    print(color_name, success_rate)
+    return success_rate
+    
+
 
 
 # Loop through the images
 for image_path in rgb_images:
-    
     
     
     if i == 11:
@@ -117,9 +124,7 @@ for image_path in rgb_images:
     
     trans_img, homography = pp.retrieve_transformed_plane(original_img, depth_blurred)
 
-    
-    
-    
+
     
     #preds =  segment.locateHazard(trans_img)
     
@@ -128,13 +133,17 @@ for image_path in rgb_images:
     #for bounds in Roi:
     #        cropped = preds[bounds[1]:bounds[3], bounds[0]:bounds[2]]
             
-    #cv2.imshow("crop", cropped) 
-    #cv2.waitKey(0)
-           
+
+    
+
+
+            
 
     box_text= read.findText(trans_img)
     
     resized_depth_img = cv2.resize(trans_img, (960, 540))
+    
+
     
     resized_img = cv2.resize(original_img, (960, 540))
     
@@ -155,12 +164,14 @@ for image_path in rgb_images:
             'weight': 'normal',
             'size': 12}
     
+
     
     
-    plt.figure(figsize=(10, 5))  # Set the figure size to 10x10 inches
-    plt.title(image_filename_without_extension)
-    plt.imshow(cv2.cvtColor(original_img, cv2.COLOR_BGR2RGB))
-    plt.show()
+    
+    #plt.figure(figsize=(7, 5))  # Set the figure size to 10x10 inches
+    #plt.title(image_filename_without_extension)
+    #plt.imshow(cv2.cvtColor(original_img, cv2.COLOR_BGR2RGB))
+    #plt.show()
     
     current_set_df = pd.DataFrame(columns=['picturename', 'size', 'x', 'y', 'orientation', 'text', 'color '])
     
@@ -170,7 +181,7 @@ for image_path in rgb_images:
     #print(df['picturename'] == image_filename_without_extension)
     #print(df.loc[df['picturename'] == image_filename_without_extension])
     
-    # Select the rows with orientation = 0
+    # Select the rows with the current picture name
     selected_rows = df.loc[df['picturename'] == image_filename_without_extension]
     
     #print(selected_rows)
@@ -182,25 +193,23 @@ for image_path in rgb_images:
         current_row = {'picturename': row['picturename'], 'size': row['size'], 'x': row['x'], 'y': row['y'],'orientation': row['orientation'],'text': row['text'], 'color': row['color']}
         positions.append([int(row['x']),int(row['y'])])
         current_set_df = pd.concat([current_set_df, pd.DataFrame(current_row, index=[0])], ignore_index=True)
-
   
-    
     for count, box in enumerate(box_text):
         
         
         
 
         center = np.sum(box[:,0])/len(box),np.sum(box[:,1])/len(box)
-        text = read.readText(trans_img, box, True)
-        print("text was found: " , text)
+        text = read.readText(trans_img, box)
+        #print("text was found: " , text)
         # Define the values you want to write to the CSV file
         picturename = image_filename_without_extension
         size_value = size[k]
         coordinates = center
-        real_coordinates = pp.transformed_to_original_pixel(center, homography)
+        #real_coordinates = pp.transformed_to_original_pixel(center, homography)
         orientation_value = current_orientation[i]
         text_on_box = text
-        real_box = list(map(lambda x: list(pp.transformed_to_original_pixel(x, homography)), box))
+        real_box = list(map(lambda x: list(pp.transformed_to_original_pixel(trans_img,x, homography)), box))
         
 
         # Extract the bounding area
@@ -218,78 +227,91 @@ for image_path in rgb_images:
         
         biggest_point = [xmax, ymax]
         
-        print(smallest_point, biggest_point)
-        print(positions)
+        #print(smallest_point, biggest_point)
+        #print(positions)
 
-    
-        
         for pos, (x, y) in enumerate(positions):
             if (smallest_point[0] < x)  and (biggest_point[0] > x) and  (smallest_point[1] < y)  and (biggest_point[1] > y):
                 
                 #print("New_picture: ", picturename, text, current_set_df.loc[pos, "color"], orientation_value, size_value)
                 the_color = current_set_df.loc[pos, "color"]
-                print(the_color)
+                the_color = the_color.replace("  ","")
+                
+                
+               
+                
+                #if text_on_box == " 4G/Y30/S/22/D/BAM": #remember to change 0 to D
+                    
+                
+                #if the_color == "  yellow":
+                       
+                
+                #label = f" {picturename},  {size_value},  {x}, {y},  {orientation_value}, 4GY30S22DBAM, {the_color}"
+                if text_on_box == "4G/Y30/S/22/D/BAM":
+                    if the_color == "yellow":
+                        succesful_yellow += 1
+                    if the_color == "brown":
+                        succesful_brown += 1
+                    if the_color == "red":
+                        succesful_red += 1
+                    if  the_color == "blue":
+                         succesful_blue += 1
+                    if the_color == "green":
+                        succesful_green += 1
+                    if the_color == "black":
+                        succesful_black += 1
+                    if  the_color == "white":
+                        succesful_white += 1
+                    if  the_color == "orange":
+                        succesful_orange += 1 
+                     
+                    
+              
+                    
+                              
 
-                csv_output_string = f"{image_filename_without_extension},{size_value},{orientation_value},{the_color},{text_on_box},4G/Y30/S/22/D/BAM "
+                csv_output_string = f"{image_filename_without_extension},{size_value},{orientation_value},{the_color},{text_on_box}, 4G/Y30/S/22/D/BAM "
+                current_set_df = current_set_df[(current_set_df['color'] != current_set_df.loc[pos, "color"])]
                 
                 output_list.append(csv_output_string)
+            
+    for index, row in current_set_df.iterrows():
+        the_color = row["color"]
+        the_color = the_color.replace("  ", "")
+
+        csv_output_string = f"{image_filename_without_extension},{size_value},{orientation_value},{the_color},nan, 4G/Y30/S/22/D/BAM"
+        output_list.append(csv_output_string)
+            
+    #csv_output_string = f"{image_filename_without_extension},{size_value},{orientation_value},{the_color},{text_on_box},4GY30S22DBAM "
+
+    #print(output_list)          
     #print(csv_output_string)      
-    print(output_list)
+   
 
     i = i + 1 
    
-# Open the CSV file in append mode
-with open(csv_file_path, mode_output='a', newline='') as file:
-    writer = csv.writer(file)
+    # Open the CSV file in append mode
+with open(csv_file_path_output, mode='w', newline='') as file:
+    file.write("picturename,size,orientation,background_color,read_text,ground_truth_text\n")    
+    for string in output_list:
+        file.write(string + "\n")
+        
 
-    # Write the data using a for loop
-    for row in output_list:
-        writer.writerow(row)
+red_rate = calc_success_rate(succesful_red, "red")   
+green_rate = calc_success_rate(succesful_green, "green")  
+blue_rate = calc_success_rate(succesful_blue, "blue")       
+orange_rate = calc_success_rate(succesful_orange, "orange")  
+black_rate = calc_success_rate(succesful_black, "black")  
+white_rate = calc_success_rate(succesful_white, "white")  
+brown_rate = calc_success_rate(succesful_brown, "brown") 
+yellow_rate = calc_success_rate(succesful_yellow, "yellow")   
 
 print("CSV file updated successfully.")
 
 
 
                 
-"""                if text_on_box == "4G/Y30/S/22/D/BAM": #remember to change 0 to D
-                    print("I read good")
-                if the_color == "  yellow":
-                    print("im yellow")    
-                
-                #label = f" {picturename},  {size_value},  {x}, {y},  {orientation_value}, 4G/Y30/S/22/D/BAM, {the_color}"
-                if text_on_box == "4G/Y30/S/22/D/BAM" and  the_color.value == "  yellow":
-                    successful_yellow += 1
-                    print("hello")
-                    
-                if text_on_box == "4G/Y30/S/22/D/BAM" and  the_color.value == "  brown":
-                    successful_brown += 1
-                    print("hello")    
-                    
-                if text_on_box == "4G/Y30/S/22/D/BAM" and  the_color.value == "  red":
-                    yellow = yellow + 1
-                    print("hello") 
-                    
-                    
-                    
-                if text_on_box == "4G/Y30/S/22/D/BAM" and  the_color.value == "  blue":
-                    yellow = yellow + 1
-                    print("hello") 
-                    
-                    
-                if text_on_box == "4G/Y30/S/22/D/BAM" and  the_color.value == "  green":
-                    yellow = yellow + 1
-                    print("hello")
-                    
-                    
-                if text_on_box == "4G/Y30/S/22/D/BAM" and  the_color.value == "  black":
-                    yellow = yellow + 1
-                    print("hello") 
-                    
-                    
-                if text_on_box == "4G/Y30/S/22/D/BAM" and  the_color.value == "  white":
-                    yellow = yellow + 1
-                    print("hello")          
-                    """
+
                 
 
         

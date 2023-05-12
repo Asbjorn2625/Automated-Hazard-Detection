@@ -19,7 +19,7 @@ def format_degree(value):
         return f"{value}$^\circ$"
 
 
-columns = { "Real_angle":[], "Predicted_angle": [],"diffrence": []}
+columns = { "Real angle":[], "Predicted angle": [],"difference": []}
 
 
 
