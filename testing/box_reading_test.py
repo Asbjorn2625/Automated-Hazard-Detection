@@ -124,9 +124,7 @@ for image_path in rgb_images:
     
     trans_img, homography = pp.retrieve_transformed_plane(original_img, depth_blurred)
 
-    
-    
-    
+
     
     #preds =  segment.locateHazard(trans_img)
     
@@ -135,8 +133,7 @@ for image_path in rgb_images:
     #for bounds in Roi:
     #        cropped = preds[bounds[1]:bounds[3], bounds[0]:bounds[2]]
             
-    #cv2.imshow("crop", cropped) 
-    #cv2.waitKey(0)
+
     
 
 
@@ -145,6 +142,8 @@ for image_path in rgb_images:
     box_text= read.findText(trans_img)
     
     resized_depth_img = cv2.resize(trans_img, (960, 540))
+    
+
     
     resized_img = cv2.resize(original_img, (960, 540))
     
@@ -165,9 +164,11 @@ for image_path in rgb_images:
             'weight': 'normal',
             'size': 12}
     
+
     
     
-    #plt.figure(figsize=(10, 5))  # Set the figure size to 10x10 inches
+    
+    #plt.figure(figsize=(7, 5))  # Set the figure size to 10x10 inches
     #plt.title(image_filename_without_extension)
     #plt.imshow(cv2.cvtColor(original_img, cv2.COLOR_BGR2RGB))
     #plt.show()
@@ -192,15 +193,15 @@ for image_path in rgb_images:
         current_row = {'picturename': row['picturename'], 'size': row['size'], 'x': row['x'], 'y': row['y'],'orientation': row['orientation'],'text': row['text'], 'color': row['color']}
         positions.append([int(row['x']),int(row['y'])])
         current_set_df = pd.concat([current_set_df, pd.DataFrame(current_row, index=[0])], ignore_index=True)
-    
+  
     for count, box in enumerate(box_text):
         
         
         
 
         center = np.sum(box[:,0])/len(box),np.sum(box[:,1])/len(box)
-        text = read.readText(trans_img, box, False)
-        print("text was found: " , text)
+        text = read.readText(trans_img, box)
+        #print("text was found: " , text)
         # Define the values you want to write to the CSV file
         picturename = image_filename_without_extension
         size_value = size[k]
@@ -226,11 +227,9 @@ for image_path in rgb_images:
         
         biggest_point = [xmax, ymax]
         
-        print(smallest_point, biggest_point)
-        print(positions)
+        #print(smallest_point, biggest_point)
+        #print(positions)
 
-    
-        
         for pos, (x, y) in enumerate(positions):
             if (smallest_point[0] < x)  and (biggest_point[0] > x) and  (smallest_point[1] < y)  and (biggest_point[1] > y):
                 
@@ -239,12 +238,13 @@ for image_path in rgb_images:
                 the_color = the_color.replace("  ","")
                 
                 
-                print(the_color)
+               
                 
-                if text_on_box == " 4G/Y30/S/22/D/BAM": #remember to change 0 to D
-                    print("I read good")
-                if the_color == "  yellow":
-                    print("im yellow")    
+                #if text_on_box == " 4G/Y30/S/22/D/BAM": #remember to change 0 to D
+                    
+                
+                #if the_color == "  yellow":
+                       
                 
                 #label = f" {picturename},  {size_value},  {x}, {y},  {orientation_value}, 4GY30S22DBAM, {the_color}"
                 if text_on_box == "4G/Y30/S/22/D/BAM":

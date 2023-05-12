@@ -46,16 +46,15 @@ class ReadText:
         rect = cv2.minAreaRect(np.array([(x1, y1), (x2, y2), (x3, y3), (x4, y4)], dtype=np.float32))
 
         # Get the angle of rotation
-        angle = rect[2]
-        #if angle < -45:
-        #    angle += 90
+        angle = rect[2] - 90
+        if angle < -45:
+            angle += 90
 
         # Create the rotation matrix and apply it
         center = rect[0]
         rot_mat = cv2.getRotationMatrix2D(center, angle, 1)
-        rotated_image = image #cv2.warpAffine(image, rot_mat, (image.shape[1], image.shape[0]))
+        rotated_image = cv2.warpAffine(image, rot_mat, (image.shape[1], image.shape[0]),flags=cv2.INTER_CUBIC)
         
-        #cv2.imshow("rotated_image?", rotated_image)
         
         xmin = min(x1, x2, x3, x4)
         xmax = max(x1, x2, x3, x4)
@@ -79,10 +78,7 @@ class ReadText:
         if ymax - ymin > xmax - xmin:
             cropped_image = cv2.rotate(cropped_image, cv2.ROTATE_90_CLOCKWISE)
         
-        
-
-        
-        #cv2.imshow("cropped image?", cropped_image)
+    
         
         # Convert to grayscale
         if len(image > 2):
@@ -92,47 +88,11 @@ class ReadText:
         scale_factor = 3
         resized_image = cv2.resize(gray, (gray.shape[1] * scale_factor, gray.shape[0] * scale_factor), interpolation=cv2.INTER_LANCZOS4)
 
-        #cv2.imshow("resise", resized_image)
 
-
+        _, thresh = cv2.threshold(resized_image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
         
-        # Get the dimensions of the image
-        h, w = resized_image.shape[:2]
-
-        # Define the percentage values for cropping
-        cropping_precentage = 0.1
-
-        # Calculate the number of pixels to crop from each side
-        left_to_right = int(w * cropping_precentage)
-        top_to_bottom = int(h * cropping_precentage)
-        
-
-        # Crop the image to get rid of background noise, we only want to look at the text color and background color 
-        text_check = resized_image[top_to_bottom:h-top_to_bottom, left_to_right:w-left_to_right]
-        
-        cv2.imshow("crop", cropped_image)
-        
-        # Find the maximum and minimum pixel values
-        max_pixel_value = np.max(text_check)
-        min_pixel_value = np.min(text_check)
-
-        # Calculate the mean pixel value
-        mean_pixel_value = cv2.mean(text_check)[0]
-        
-        #print(mean_pixel_value)
-        
-        #print("This is the max and min pix val, max: ", max_pixel_value,"min: ", min_pixel_value)
-
-        # Set the thresholding method based on the maximum, minimum, and mean pixel values
-        # used to find out what the text color and thresholds acordingly 
-        if (max_pixel_value - min_pixel_value > 100) and (min_pixel_value < 20):
-            # If the range of pixel values is small, use the mean to determine the thresholding method
-            if mean_pixel_value > 60:
-                _, thresh = cv2.threshold(resized_image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-            else:
-                _, thresh = cv2.threshold(resized_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        else:
-             _, thresh = cv2.threshold(resized_image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        if np.sum(thresh > 100) > np.sum(thresh < 100):
+            thresh = cv2.bitwise_not(thresh) 
 
 
         
@@ -148,7 +108,14 @@ class ReadText:
         # Display the process
         if display:
             cv2.imshow("segmented image", segmented)
+            cv2.imshow("cropped", cropped_image)
             cv2.waitKey(0)
+            
+        ratio = gray.shape[1]/gray.shape[0]
+        
+        new_width = int(ratio*125)    
+        
+        segmented = cv2.resize(segmented, (new_width, 100), interpolation=cv2.INTER_LANCZOS4)
         
         # Extract the text through the tesseract
         text = pytesseract.image_to_string(segmented, config=config)
