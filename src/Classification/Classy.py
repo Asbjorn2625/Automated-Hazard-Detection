@@ -30,68 +30,7 @@ class classifier():
         return  label_bent
     
     
-    def label_oriention(self,img):
-        contours = self.calc_cnt(img)
-        area = 0 
-        for innercnt in contours:
-            # Calculate the largest contour moment
-            innerarea = cv2.contourArea(innercnt)
-            if innerarea > area:
-                area = innerarea
-                cnt = innercnt
-
-        # Compute the centroid of the contour
-        M = cv2.moments(cnt)
-        cx = int(M['m10'] / M['m00'])
-        cy = int(M['m01'] / M['m00'])
-        max_dist = 0
-        farthest_pt = None
-        for pt in cnt:
-            dist = np.sqrt((pt[0][0]-cx)**2 + (pt[0][1]-cy)**2)
-            if dist > max_dist:
-                max_dist = dist
-                farthest_pt = pt[0]
-        dx = farthest_pt[0] - cx
-        dy = farthest_pt[1] - cy
-        angle = np.arctan2(dy, dx) * 180 / np.pi
-        return round(angle,2)
     
-    def convex_hull_oriention(self, img):
-        contours = self.calc_cnt(img)
-        area = 0 
-        for innercnt in contours:
-            # Calculate the largest contour moment
-            innerarea = cv2.contourArea(innercnt)
-            if innerarea > area:
-                area = innerarea
-                cnt = innercnt
-
-    
-        # Compute the convex hull of the contour
-        hull = cv2.convexHull(cnt, returnPoints=False)
-        
-        # Compute the convexity defects of the contour and hull
-        defects = cv2.convexityDefects(cnt, hull)
-        
-        # Find the largest defect depth
-        max_depth = 0
-        max_depth_start = None
-        max_depth_end = None
-        for i in range(defects.shape[0]):
-            start_idx, end_idx, farthest_idx, depth = defects[i][0]
-            if depth > max_depth:
-                max_depth = depth
-                max_depth_start = tuple(cnt[start_idx][0])
-                max_depth_end = tuple(cnt[end_idx][0])
-        
-        # Draw a line between the start and end points of the largest defect
-        if max_depth_start is not None and max_depth_end is not None:
-            dx = max_depth_end[0] - max_depth_start[0]
-            dy = max_depth_end[1] - max_depth_start[1]
-            angle = np.arctan2(dy, dx) * 180 / np.pi
-            return round(angle,2)
-        else:
-            return None
     def Orientation(self, img):
         contours = self.calc_cnt(img)
         area = 0 
@@ -128,4 +67,51 @@ class classifier():
             return round(angle_deg,2)
         else:
             return None
+    def detect_package_orientation(image, Display=False):
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+        
+        ret, thresh = cv2.threshold(image,20,255, cv2.THRESH_BINARY)
+        cnt, hierachy = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        image = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
+        largest_extent = float("-inf")
+        for c in cnt:
+            #measure the extent of the contour
+            cnt_area = cv2.contourArea(c)
+            # find the rotated rectangle that encloses the contour
+            rect = cv2.minAreaRect(c)
+            box = cv2.boxPoints(rect)
+            box = [[int(point[0]), int(point[1])] for point in box]
+        
+            box_area = cv2.contourArea(np.array(box))
+            extent = cnt_area/box_area
+            
+            if extent > largest_extent:
+                largest_extent = extent
+                best_box = box
+                box = np.array(box)
+                # get the longest side of the box
+                long_side_index = np.argmax([np.linalg.norm(box[i] - box[(i+1)%4]) for i in range(4)])
+                
+                # Get the angel of the longest side
+                dx = box[long_side_index][0] - box[(long_side_index+1)%4][0]
+                dy = box[long_side_index][1] - box[(long_side_index+1)%4][1]
+                angle = np.arctan2(dy, dx) * 180 / np.pi
+                #angle = 90-angle
+                if angle < 0:
+                    angle += 180
+                angle = (angle)%180
+                if angle > 90:
+                    angle = (angle)-180
+                angle = abs(angle)
+            
+                
+        cv2.drawContours(image, [np.array(best_box)], 0, (0, 0, 255), 2)
+        # Resize image
+        image = cv2.resize(image, (image.shape[1]//2, image.shape[0]//2))
+        # Display the image
+        if Display:
+            cv2.imshow("Image", image)
+            cv2.waitKey(0)
+        return round(angle,2)
         
