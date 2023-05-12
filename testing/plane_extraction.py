@@ -11,7 +11,7 @@ import random
 pp = PreProcess()
 
 # Create list of image filenames
-rgb_images = [f'./testing/orientation_tests/{img}' for img in os.listdir("./testing/orientation_tests") if img.startswith("rgb_image")]
+rgb_images = "rgb_image_0128.png"
 
 # Loop through the images
 for image in rgb_images:
