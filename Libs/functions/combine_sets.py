@@ -48,9 +48,9 @@ def move_files(src_image_folder, src_mask_folder, dst_image_folder, dst_mask_fol
             # Get the new number
             new_num = start_num + file_num
             # Get the new name
-            new_img_name = file_name.replace(str(file_num).zfill(4), str(new_num).zfill(4))
-            new_depth_name = depth_name.replace(str(file_num).zfill(4), str(new_num).zfill(4))
-            new_mask_name = file[1].replace(str(file_num-1).zfill(4), str(new_num).zfill(4)) + ".png"
+            new_img_name = file_name.replace("image_"+str(file_num).zfill(4), "image_"+str(new_num).zfill(4))
+            new_depth_name = depth_name.replace("image_"+str(file_num).zfill(4), "image_"+str(new_num).zfill(4))
+            new_mask_name = file[1].replace("image_"+str(file_num-1).zfill(4), "image_"+str(new_num).zfill(4)) + ".png"
             new_mask_name = new_mask_name.replace("rgb1_", "rgb_")
             # Get the file paths
             image_file_path = os.path.join(src_image_folder, file_name)

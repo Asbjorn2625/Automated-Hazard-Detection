@@ -42,8 +42,8 @@ def display_images(images):
     plt.show()
 
 types_of_models = ['CombinedLoss', 'Dice_loss', 'IoU','CrossEntropy']
-mask_types = ['hazard', 'UN_circle', 'CAO', 'Shipping', 'this_side_up']
-
+#mask_types = ['hazard', 'UN_circle', 'CAO', 'Shipping', 'this_side_up']
+mask_types = ['this_side_up']
 if __name__ == "__main__":
     # get the parent directory of the current module
     current_file_path = os.path.abspath(__file__)
@@ -120,7 +120,7 @@ if __name__ == "__main__":
 
     # Writing results to a CSV file
     csv_columns = ["image", "model", "mask", "precision", "recall", "accuracy", "dice", "iou"]
-    csv_file = "results.csv"
+    csv_file = "results2.csv"
 
     with open(csv_file, "w", newline="") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=csv_columns)

@@ -54,10 +54,8 @@ class UNETTrainer:
             # Fix the folder for the UNET
             rgb_list = [f'{img}' for img in os.listdir(rgb_folder) if img.startswith("rgb_image")]
             mask_list = [f'{img}' for img in os.listdir(mask_folder)]
-
             mask_list = self._merge_masks(mask_folder, mask_list)
             rgb_list = self._onlyTruths(rgb_list, mask_list)
-            print(len(rgb_list), len(mask_list))
             train_folders, test_folders = self._split_images(base_folder, rgb_folder, mask_folder, rgb_list, mask_list)
             # Preprocess the images
             self._preprocess_images(train_folders, test_folders, rgb_folder)
@@ -335,7 +333,7 @@ class UNETTrainer:
             # Warp the images
             trans_img, _, trans_mask = pp.retrieve_transformed_plane(rgb, depth, mask=mask)
 
-            if np.any(trans_mask != 0):
+            if np.sum(trans_mask != 0) > 500:
                 # Save the images
                 cv2.imwrite(os.path.join(test_folders[0], mask_file), trans_mask)
                 cv2.imwrite(os.path.join(test_folders[1], rgb_file), trans_img)
