@@ -1,9 +1,10 @@
 import sys
 sys.path.append('/workspaces/Automated-Hazard-Detection')
+sys.path.append('/workspaces/P6-Automated-Hazard-Detection')
 
 from src.Segmentation.segmentation import Segmentation
 from src.Preprocess.prep import PreProcess
-from src.Data_acquisition.Image_fetcher import ImageFetcher
+#from src.Data_acquisition.Image_fetcher import ImageFetcher
 
 from src.Text_reader.ReaderClass import ReadText
 import os
@@ -13,8 +14,9 @@ import random
 import matplotlib.pyplot as plt
 import csv
 import pandas as pd
-
-
+from tqdm import tqdm
+import re
+from itertools import islice
 
 
 
@@ -24,17 +26,45 @@ def display_depth_image(depth_image, title='Depth Image'):
     plt.axis('off')
     plt.show()
     
-
+def transform_list(image_list, image_path, pre_processer):
+    # Create transformed list folder
+    folder_path = os.path.join(image_path, "transformed_images")
+    os.makedirs(folder_path, exist_ok=True)
+    
+    # Create csv list
+    csv_list = []
+    for image_path in tqdm(image_list):
+        original_img = cv2.imread(image_path)
+    
+        depth = np.fromfile(image_path.replace("rgb_image", "depth_image").replace("png", "raw"), dtype=np.uint16)
+        # Reconstruct the depth map
+        depth = depth.reshape(int(1080), int(1920))
         
+        # undistort the image
+        original_img = pre_processer.undistort_images(original_img)
+        
+        depth = pre_processer.undistort_images(depth)
+        
+        trans_img, homography = pre_processer.retrieve_transformed_plane(original_img, depth)
+        # Save path
+        save_path = os.path.join(folder_path, image_path.split("/")[-1])
+        # Save the image into the folder
+        cv2.imwrite(save_path, trans_img)
+        
+        # Save the transformed image and homography into the csv list
+        csv_list.append({"image_path": image_path, "transformed_image_path": save_path, "homography": homography})
+    # save the csv list
+    csv_path = os.path.join(folder_path, "transformed_images.csv")
+    with open(csv_path, "w") as f:
+        writer = csv.DictWriter(f, fieldnames=csv_list[0].keys())
+        writer.writeheader()
+        writer.writerows(csv_list)
+    return
         
 
 pp = PreProcess()
 
 read = ReadText()
-
-#segment = Segmentation()
-
-#imma_pre = PreProcess()
 
 i = 0
 
@@ -44,27 +74,28 @@ page_count = 1
 
 
 
-New_set = False
+NEW_SET = False
+
+#Folder path
+current_file_path = os.path.abspath(__file__)
+# Get the folder containing the current file
+current_folder = os.path.dirname(current_file_path)
+
+image_folder = os.path.join(current_folder, "Final_reading_test")
+
+# Image path
 
 # Create list of image filenames
-rgb_images = [f'./testing/Final_reading_test/{img}' for img in os.listdir("./testing/Final_reading_test/") if img.startswith("rgb_image")]
+rgb_images = [os.path.join(image_folder, img) for img in os.listdir(image_folder) if img.startswith("rgb_image")]
 
-csv_file_path = "/workspaces/Automated-Hazard-Detection/testing/color_test.csv"
+csv_file_path = os.path.join(current_folder, "color_test.csv")
 
 
-csv_file_path_output = "/workspaces/Automated-Hazard-Detection/testing/reading_test_output.csv"
+csv_file_path_output = os.path.join(current_folder, "reading_test_output.csv")
 
 # Create a list to store the label strings for each image
 label_list = []
-
-label_data_from_csv = []
-
-#with open(csv_file_path, newline='') as csvfile:
-#    reader = csv.reader(csvfile, delimiter=',')
-#    for row in reader:
-#        label_data_from_csv.append(row)
-        
-#print(label_data_from_csv)        
+label_data_from_csv = []       
 
 
 # read the CSV file into a DataFrame
@@ -72,9 +103,6 @@ df = pd.read_csv(csv_file_path)
 
 # convert the DataFrame to a dictionary
 my_dict = df.to_dict('list')
-
-#print the dictionary
-#print(my_dict)  
 
 output_list = []  
 
@@ -91,65 +119,47 @@ succesful_green = 0
 def calc_success_rate(color, color_name):
     success_rate = color/66
     print(color_name, success_rate)
-    return success_rate
-    
+    return success_rate    
 
+if NEW_SET:
+    transform_list(rgb_images, image_folder, pp)
 
+# Load the csv file
+csv_file_path = os.path.join(image_folder, "transformed_images/transformed_images.csv")
+df_imges = pd.read_csv(csv_file_path)
 
 # Loop through the images
-for image_path in rgb_images:
+for path, transform_path, homography in tqdm(islice(zip(df_imges["image_path"], df_imges["transformed_image_path"], df_imges["homography"]), 0, None), "Reading images"):
+
+    # Load the images
+    original_img = cv2.imread(path)
+    trans_img = cv2.imread(transform_path)
     
-    
+
+    # Remove brackets and newlines, and replace multiple spaces with single spaces
+    homography = re.sub('\s+', ' ', homography.replace('[', '').replace(']', '').replace('\n', ''))
+
+    # Use np.fromstring to convert the string to a 1D array
+    homography = np.fromstring(homography, sep=' ')
+    # Fix the homography
+    homography = homography.reshape(-1, 3)
+
     if i == 11:
         k = k + 1
         i = 0
         page_count += 1
     
-    
-    original_img = cv2.imread(image_path)
-    
-    depth = np.fromfile(image_path.replace("rgb_image", "depth_image").replace("png", "raw"), dtype=np.uint16)
-    # Reconstruct the depth map
-    depth = depth.reshape(int(1080), int(1920))
-     
-    # undistort the image
-    original_img = pp.undistort_images(original_img)
-    
-    depth = pp.undistort_images(depth)
-    
-    width, length = pp.get_pixelsize(depth)
-    
-    
-    depth_blurred = cv2.medianBlur(depth, 5)
-    
-    trans_img, homography = pp.retrieve_transformed_plane(original_img, depth_blurred)
-
 
     
-    #preds =  segment.locateHazard(trans_img)
-    
-    #Roi = pp.segmentation_to_ROI(preds)
-    
-    #for bounds in Roi:
-    #        cropped = preds[bounds[1]:bounds[3], bounds[0]:bounds[2]]
-            
-
-    
-
-
-            
-
     box_text= read.findText(trans_img)
     
     resized_depth_img = cv2.resize(trans_img, (960, 540))
-    
-
     
     resized_img = cv2.resize(original_img, (960, 540))
     
     current_orientation = [0,170,160,150,140,135,10,20,30,40,45] 
     
-    image_filename = os.path.basename(image_path)
+    image_filename = os.path.basename(path)
 
     # Remove the file extension from the filename
     image_filename_without_extension = os.path.splitext(image_filename)[0]
@@ -163,9 +173,6 @@ for image_path in rgb_images:
             'color':  'black',
             'weight': 'normal',
             'size': 12}
-    
-
-    
     
     
     #plt.figure(figsize=(7, 5))  # Set the figure size to 10x10 inches
@@ -196,12 +203,9 @@ for image_path in rgb_images:
   
     for count, box in enumerate(box_text):
         
-        
-        
-
         center = np.sum(box[:,0])/len(box),np.sum(box[:,1])/len(box)
-        text = read.readText(trans_img, box)
-        #print("text was found: " , text)
+        text = read.readText(trans_img, box, display=False)
+        #print("\n text was found: " , text)
         # Define the values you want to write to the CSV file
         picturename = image_filename_without_extension
         size_value = size[k]
@@ -226,27 +230,14 @@ for image_path in rgb_images:
         smallest_point = [xmin, ymin]
         
         biggest_point = [xmax, ymax]
-        
-        #print(smallest_point, biggest_point)
-        #print(positions)
+
 
         for pos, (x, y) in enumerate(positions):
             if (smallest_point[0] < x)  and (biggest_point[0] > x) and  (smallest_point[1] < y)  and (biggest_point[1] > y):
                 
-                #print("New_picture: ", picturename, text, current_set_df.loc[pos, "color"], orientation_value, size_value)
                 the_color = current_set_df.loc[pos, "color"]
                 the_color = the_color.replace("  ","")
                 
-                
-               
-                
-                #if text_on_box == " 4G/Y30/S/22/D/BAM": #remember to change 0 to D
-                    
-                
-                #if the_color == "  yellow":
-                       
-                
-                #label = f" {picturename},  {size_value},  {x}, {y},  {orientation_value}, 4GY30S22DBAM, {the_color}"
                 if text_on_box == "4G/Y30/S/22/D/BAM":
                     if the_color == "yellow":
                         succesful_yellow += 1
@@ -263,12 +254,7 @@ for image_path in rgb_images:
                     if  the_color == "white":
                         succesful_white += 1
                     if  the_color == "orange":
-                        succesful_orange += 1 
-                     
-                    
-              
-                    
-                              
+                        succesful_orange += 1                    
 
                 csv_output_string = f"{image_filename_without_extension},{size_value},{orientation_value},{the_color},{text_on_box}, 4G/Y30/S/22/D/BAM "
                 current_set_df = current_set_df[(current_set_df['color'] != current_set_df.loc[pos, "color"])]
@@ -282,11 +268,6 @@ for image_path in rgb_images:
         csv_output_string = f"{image_filename_without_extension},{size_value},{orientation_value},{the_color},nan, 4G/Y30/S/22/D/BAM"
         output_list.append(csv_output_string)
             
-    #csv_output_string = f"{image_filename_without_extension},{size_value},{orientation_value},{the_color},{text_on_box},4GY30S22DBAM "
-
-    #print(output_list)          
-    #print(csv_output_string)      
-   
 
     i = i + 1 
    
@@ -307,123 +288,3 @@ brown_rate = calc_success_rate(succesful_brown, "brown")
 yellow_rate = calc_success_rate(succesful_yellow, "yellow")   
 
 print("CSV file updated successfully.")
-
-
-
-                
-
-                
-
-        
-
-
-
-        #label = f"New_image: , {picturename},  {size_value},  {real_coordinates},  {orientation_value}, {text_on_box};"
-        #label_list.append(label)
-        #print(label)
-        
-        
-        
-
-
-    
-    
-
-      
-
-
-    
-
-# Set plot title and axis labels
-#ax.set_title("Image Data")
-#ax.set_xlabel("Size")
-#ax.set_ylabel("Orientation")
-
- 
-
-
-
-
-
-
-
-  
-     
-    #cv2.imshow("img", resized_depth_img)
-    #cv2.imshow("img1", resized_img)
-    #for box in box_text:
-        
-       
-    #    text = read.readText(trans_img, box, False, True)
-    #    print("text was found: " , text)
-        
-        
-    #cv2.imshow("rgb", trans_img)
-
-    
-    #cv2.waitKey(0)
-
-"""
-# define color ranges for each category
-brown_range = np.array([[125, 0, 120], [180, 20, 150]])
-other_brown_range = np.array([[0, 20, 120], [10, 50, 150]])
-red_range = np.array([[0, 170, 100], [5, 255, 150]])
-yellow_range = np.array([[20, 100, 100], [30, 200, 200]])
-green_range = np.array([[45, 140, 40], [90, 255, 80]])
-blue_range = np.array([[85, 100, 100], [130, 255, 170]])
-orange_range = np.array([[5, 180, 130], [10, 220, 160]])
-black_range = np.array([[0, 0, 0], [180, 255, 30]])
-white_range = np.array([[0, 0, 200], [180, 50, 255]])
-
-
-# convert image to HSV color space
-hsv = cv2.cvtColor(trans_img, cv2.COLOR_BGR2HSV)
-
-# create a window and set mouse callback function to get HSV values
-cv2.namedWindow("Image")
-cv2.setMouseCallback("Image", get_hsv_values, param=hsv)
-
-cv2.imshow("hsv", hsv)
-
-
-
-# apply color filters to isolate colors
-brown_mask = cv2.inRange(hsv, brown_range[0], brown_range[1])
-other_brown_mask = cv2.inRange(hsv, other_brown_range[0], other_brown_range[1])
-red_mask = cv2.inRange(hsv, red_range[0], red_range[1])
-yellow_mask = cv2.inRange(hsv, yellow_range[0], yellow_range[1])
-green_mask = cv2.inRange(hsv, green_range[0], green_range[1])
-blue_mask = cv2.inRange(hsv, blue_range[0], blue_range[1])
-orange_mask = cv2.inRange(hsv, orange_range[0], orange_range[1])
-black_mask = cv2.inRange(hsv, black_range[0], black_range[1])
-white_mask = cv2.inRange(hsv, white_range[0], white_range[1])
-
-# apply masks to original image to show only pixels in each color category
-brown_img = cv2.bitwise_and(trans_img, trans_img, mask=brown_mask)
-other_brown_img = cv2.bitwise_and(trans_img, trans_img, mask=other_brown_mask)
-red_img = cv2.bitwise_and(trans_img, trans_img, mask=red_mask)
-yellow_img = cv2.bitwise_and(trans_img, trans_img, mask=yellow_mask)
-green_img = cv2.bitwise_and(trans_img, trans_img, mask=green_mask)
-blue_img = cv2.bitwise_and(trans_img, trans_img, mask=blue_mask)
-orange_img = cv2.bitwise_and(trans_img, trans_img, mask=orange_mask)
-black_img = cv2.bitwise_and(trans_img, trans_img, mask=black_mask)
-white_img = cv2.bitwise_and(trans_img, trans_img, mask=white_mask)
-
-# display the images
-cv2.imshow("Brown", brown_img)
-cv2.imshow("other_Brown", other_brown_img)
-cv2.imshow("Red", red_img)
-cv2.imshow("Yellow", yellow_img)
-cv2.imshow("Green", green_img)
-cv2.imshow("Blue", blue_img)
-cv2.imshow("Orange", orange_img)
-cv2.imshow("Black", black_img)
-cv2.imshow("White", white_img)
-
-# wait for a key press and close all windows
-cv2.waitKey(0)
-cv2.destroyAllWindows()
-"""
-    
-       
-        

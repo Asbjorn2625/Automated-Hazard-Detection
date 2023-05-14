@@ -1,9 +1,10 @@
 import sys
 sys.path.append('/workspaces/Automated-Hazard-Detection')
+sys.path.append('/workspaces/P6-Automated-Hazard-Detection')
 
 from src.Segmentation.segmentation import Segmentation
 from src.Preprocess.prep import PreProcess
-from src.Data_acquisition.Image_fetcher import ImageFetcher
+#from src.Data_acquisition.Image_fetcher import ImageFetcher
 
 from src.Text_reader.ReaderClass import ReadText
 import os
@@ -32,10 +33,13 @@ def levensthein_distance(read_string, ground_truth = "4G/Y30/S/22/D/BAM"):
 
 
 
+#Folder path
+current_file_path = os.path.abspath(__file__)
+# Get the folder containing the current file
+current_folder = os.path.dirname(current_file_path)
 
 
-
-Reading_test_output = "/workspaces/Automated-Hazard-Detection/testing/reading_test_output.csv"
+Reading_test_output = os.path.join(current_folder, "reading_test_output.csv")
 # read the CSV file into a DataFrame
 df = pd.read_csv(Reading_test_output)
 

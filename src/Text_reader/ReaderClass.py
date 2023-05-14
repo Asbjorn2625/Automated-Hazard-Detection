@@ -4,7 +4,10 @@ from collections import deque
 import torch
 import numpy as np
 import cv2
+import warnings
 
+# Ignore specific warning
+warnings.filterwarnings("ignore", category=UserWarning, module='torchvision.models._utils')
 class ReadText:
     # Start by loading the pre-trained CRAFT model
     def __init__(self):
@@ -17,10 +20,44 @@ class ReadText:
         :param img: input image
         :return: list Bounding boxes [corner1, corner2, corner3, corner4]
         """
+        # Convert the image to grayscale
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        # Apply histogram equalization
+        equalized = cv2.equalizeHist(gray)
+
+        # Apply CLAHE
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        clahe_img = clahe.apply(gray)
+
+        # Apply contrast stretching
+        # Compute min and max pixel values
+        min_val, max_val = np.min(gray), np.max(gray)
+        # Apply contrast stretching
+        stretched = (gray - min_val) / (max_val - min_val) * 255
+        stretched = np.uint8(stretched)
+        
         # Detect text regions
-        prediction_result = self.craft.detect_text(img.copy())
-             
-        return prediction_result["boxes"]
+        equalized_result = self.craft.detect_text(equalized.copy())
+        img_result = self.craft.detect_text(img.copy())
+        clahe_result = self.craft.detect_text(clahe_img.copy())
+        stretched_result = self.craft.detect_text(stretched.copy())
+
+        combined_boxes = []
+        combined_boxes.extend(equalized_result["boxes"])
+        combined_boxes.extend(img_result["boxes"])
+        combined_boxes.extend(clahe_result["boxes"])
+        combined_boxes.extend(stretched_result["boxes"])
+        
+        aabb_boxes = [quadrilateral_to_aabb(box) for box in combined_boxes]
+
+        # Apply NMS to the AABBs
+        nms_boxes = self._merge_boxes(aabb_boxes)
+
+        # Convert the NMS results back to quadrilaterals
+        final_result = [aabb_to_quadrilateral(box) for box in nms_boxes]
+        
+        return np.array(final_result)
 
     
     def readText(self, image, box, display=False, config='-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./- --psm 7 --oem 3', padding=10):
@@ -40,22 +77,6 @@ class ReadText:
         x3, y3 = box[2]
         x4, y4 = box[3]
         
-        
-
-         # Find the minimum area rectangle enclosing the text region
-        rect = cv2.minAreaRect(np.array([(x1, y1), (x2, y2), (x3, y3), (x4, y4)], dtype=np.float32))
-
-        # Get the angle of rotation
-        angle = rect[2] - 90
-        if angle < -45:
-            angle += 90
-
-        # Create the rotation matrix and apply it
-        center = rect[0]
-        rot_mat = cv2.getRotationMatrix2D(center, angle, 1)
-        rotated_image = cv2.warpAffine(image, rot_mat, (image.shape[1], image.shape[0]),flags=cv2.INTER_CUBIC)
-        
-        
         xmin = min(x1, x2, x3, x4)
         xmax = max(x1, x2, x3, x4)
         ymin = min(y1, y2, y3, y4)
@@ -67,47 +88,67 @@ class ReadText:
         ymin = int(ymin) - padding
         ymax = int(ymax) + padding
 
-        (h, w) = rotated_image.shape[:2]
+        (h, w) = image.shape[:2]
         xmin = max(0, xmin)
         ymin = max(0, ymin)
         xmax = min(w, xmax)
         ymax = min(h, ymax)
         
-        cropped_image = rotated_image[ymin:ymax, xmin:xmax]
+        cropped_image = image[ymin:ymax, xmin:xmax]
         
         if ymax - ymin > xmax - xmin:
             cropped_image = cv2.rotate(cropped_image, cv2.ROTATE_90_CLOCKWISE)
         
+        # Rotate the image to follow the horizontal axis
+        if cv2.countNonZero(cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY)) < 0:
+            return ""
     
         
         # Convert to grayscale
         if len(image > 2):
             gray = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = cropped_image
 
+        # Apply normalize the image
+        equalized = cv2.normalize(gray, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+        
         # Increase the size to better morph the image without damaging the detected text
         scale_factor = 3
-        resized_image = cv2.resize(gray, (gray.shape[1] * scale_factor, gray.shape[0] * scale_factor), interpolation=cv2.INTER_LANCZOS4)
+        resized_image = cv2.resize(equalized, (equalized.shape[1] * scale_factor, equalized.shape[0] * scale_factor), interpolation=cv2.INTER_LANCZOS4)
 
 
         _, thresh = cv2.threshold(resized_image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
         
+        # White text on black background
         if np.sum(thresh > 100) > np.sum(thresh < 100):
             thresh = cv2.bitwise_not(thresh) 
 
-
-        
-        kernel = np.ones((3, 3), np.uint8)  # Increase the kernel size
-        eroded_image = cv2.erode(thresh, kernel, iterations=1)
-        dilated_image = cv2.dilate(eroded_image, kernel, iterations=1)
+            kernel = np.ones((3, 3), np.uint8)  # Increase the kernel size
+            eroded_image = cv2.erode(thresh, kernel, iterations=2)
+            dilated_image = cv2.dilate(eroded_image, kernel, iterations=1)
+        else:
+            kernel = np.ones((3, 3), np.uint8)  # Increase the kernel size
+            eroded_image = cv2.erode(thresh, kernel, iterations=1)
+            dilated_image = cv2.dilate(eroded_image, kernel, iterations=1)
         
         # Remove edge blobs
         segmented = self._remove_edge_blobs(dilated_image)
         
         segmented = cv2.bitwise_not(segmented)
         
+        #angle = self._get_rotation_angle(segmented)
+        
+        #(h, w) = segmented.shape[:2]
+        #center = (w // 2, h // 2)
+        
+        #M = cv2.getRotationMatrix2D(center, angle, 1.0)
+        #segmented = cv2.warpAffine(segmented, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+        
         # Display the process
         if display:
             cv2.imshow("segmented image", segmented)
+            cv2.imshow("thresh", gray)
             cv2.imshow("cropped", cropped_image)
             cv2.waitKey(0)
             
@@ -172,4 +213,101 @@ class ReadText:
             if img[row, -1] > 0:
                 grassfire(img, (row, cols-1), new_value)
         return img
+
+    def _merge_boxes(self, boxes, overlapThresh=0.5):
+        if len(boxes) == 0:
+            return []
         
+        # Convert bounding boxes to format [x1, y1, x2, y2]
+        boxes = [[x, y, x+w, y+h] for (x, y, w, h) in boxes]
+
+        # Convert bounding boxes to numpy array
+        boxes = np.array(boxes).astype(float)
+
+        # Initialize a list to hold the picked indexes	
+        pick = []
+
+        # Grab the coordinates of the bounding boxes
+        x1 = boxes[:, 0]
+        y1 = boxes[:, 1]
+        x2 = boxes[:, 2]
+        y2 = boxes[:, 3]
+
+        # Compute the area of the bounding boxes and sort the bounding boxes by the bottom-right y-coordinate of the bounding box
+        area = (x2 - x1 + 1) * (y2 - y1 + 1)
+        idxs = np.argsort(y2)
+
+        # Keep looping while some indexes still remain in the indexes list
+        while len(idxs) > 0:
+            # Grab the last index in the indexes list and add the index value to the list of picked indexes
+            last = len(idxs) - 1
+            i = idxs[last]
+            pick.append(i)
+
+            # Find the largest (x, y) coordinates for the start of the bounding box and the smallest (x, y) coordinates for the end of the bounding box
+            xx1 = np.maximum(x1[i], x1[idxs[:last]])
+            yy1 = np.maximum(y1[i], y1[idxs[:last]])
+            xx2 = np.minimum(x2[i], x2[idxs[:last]])
+            yy2 = np.minimum(y2[i], y2[idxs[:last]])
+
+            # Compute the width and height of the bounding box
+            w = np.maximum(0, xx2 - xx1 + 1)
+            h = np.maximum(0, yy2 - yy1 + 1)
+
+            # Compute the ratio of overlap
+            overlap = (w * h) / area[idxs[:last]]
+
+            # Delete all indexes from the index list that have overlap greater than the provided overlap threshold
+            idxs = np.delete(idxs, np.concatenate(([last], np.where(overlap > overlapThresh)[0])))
+
+        # Return only the bounding boxes that were picked
+        boxes = boxes[pick].astype("int")
+
+        # Convert bounding boxes back to format [x, y, w, h]
+        boxes = [[x1, y1, x2-x1, y2-y1] for (x1, y1, x2, y2) in boxes]
+        return boxes
+    
+    def _get_rotation_angle(self, image):
+        # Perform edge detection
+        edged = cv2.Canny(image, 50, 150, apertureSize = 3)
+
+        # Perform a dilation and erosion to close gaps in between object edges
+        dilated_edged = cv2.dilate(edged.copy(), None, iterations=5)
+        eroded_edged = cv2.erode(dilated_edged.copy(), None, iterations=5)
+
+        # Perform Hough Line Transform
+        lines = cv2.HoughLinesP(eroded_edged, 1, np.pi/180, 100, minLineLength=100, maxLineGap=10)
+        # Calculate the angles of the lines
+        if lines is None:
+            return 0
+        # Calculate the angles of the lines
+        angles = []
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            angle = np.degrees(np.arctan2(y2 - y1, x2 - x1))
+            angles.append(angle)
+        # Compute the median angle (more robust than mean)
+        rotation_angle = np.median(angles)
+        
+        # Adjust the angle
+        if rotation_angle < -45:
+            rotation_angle = 90 + rotation_angle
+
+        # If the text is vertical, adjust the angle
+        if abs(rotation_angle) > 45:
+            rotation_angle = 90 - rotation_angle
+
+        return rotation_angle
+
+def quadrilateral_to_aabb(box):
+    """Convert a quadrilateral to an axis-aligned bounding box."""
+    x_coords = [point[0] for point in box]
+    y_coords = [point[1] for point in box]
+    x1, x2 = min(x_coords), max(x_coords)
+    y1, y2 = min(y_coords), max(y_coords)
+    return [x1, y1, x2-x1, y2-y1]  # format: [x, y, w, h]
+
+def aabb_to_quadrilateral(box):
+    """Convert an axis-aligned bounding box to a quadrilateral."""
+    x, y, w, h = box
+    return [[x, y], [x+w, y], [x+w, y+h], [x, y+h]]
