@@ -30,6 +30,27 @@ def display_point_cloud(point_cloud, title='Point Cloud'):
     ax.set_title(title)
     plt.show()
 
+def display_inlier_outlier_points(point_cloud, inliers, iteration, title='Inlier and Outlier Points'):
+    inlier_cloud = point_cloud.select_by_index(inliers)
+    outlier_cloud = point_cloud.select_by_index(inliers, invert=True)
+
+    inlier_cloud.paint_uniform_color([1, 0, 0])  # Red color for inliers
+    outlier_cloud.paint_uniform_color([0.5, 0.5, 0.5])  # Gray color for outliers
+
+    combined_cloud = inlier_cloud + outlier_cloud
+    # Create a visualization window
+    vis = o3d.visualization.Visualizer()
+    vis.create_window(f"{title} - Iteration {iteration}", width=int(800*2), height=1000)
+    vis.add_geometry(combined_cloud)
+
+    # Configure visualization options
+    render_option = vis.get_render_option()
+    render_option.point_size = 2  # Set point size to 1 for smaller points
+
+    # Display the point cloud
+    vis.run()
+    vis.destroy_window()
+
 def display_inlier_points(point_cloud, inliers, title='Inlier Points'):
     inlier_cloud = point_cloud.select_by_index(inliers)
     display_point_cloud(inlier_cloud, title)
@@ -61,85 +82,18 @@ def display_warped_image(warped_image, title='Warped Image'):
     plt.axis('off')
     plt.show()
 
-####### USEFUL FUNCTIONS #######
-def depth_biliteral(depth_data, d=5, sigma_color=50, sigma_space=50):
-    depth_data = depth_data.astype(np.float32)
-    
-    # Normalize depth data to the range [0, 1]
-    depth_data /= np.max(depth_data)
-    
-    # Apply a bilateral filter
-    filtered_depth_data = cv2.bilateralFilter(depth_data, d, sigma_color, sigma_space)
-    
-    # Convert the filtered depth data back to its original scale
-    filtered_depth_data *= np.max(depth_data)
-    filtered_depth_data = filtered_depth_data.astype(np.uint16)
-    
-    return filtered_depth_data
-
-def depth_to_point_cloud(depth_image, intrinsics_matrix, min_depth=30, max_depth=1500):
-    points = []
-    height, width = depth_image.shape
-    for v in range(height):
-        for u in range(width):
-            depth = depth_image[v, u]
-            if depth > min_depth and depth < max_depth:
-                x = (u - intrinsics_matrix[0, 2]) * depth / intrinsics_matrix[0, 0]
-                y = (v - intrinsics_matrix[1, 2]) * depth / intrinsics_matrix[1, 1]
-                z = depth
-                points.append([x, y, z])
-    return o3d.geometry.PointCloud(o3d.utility.Vector3dVector(np.array(points)))
-
-def extract_plane_ransac(point_cloud, distance_threshold=0.01, ransac_n=3, num_iterations=1000):
-    plane_model, inliers = point_cloud.segment_plane(distance_threshold, ransac_n, num_iterations)
-    return plane_model, inliers
-
-def angle_between_vectors(n, k):
-    cos_theta = np.dot(n, k) / (np.linalg.norm(n) * np.linalg.norm(k))
-    angle = np.arccos(np.clip(cos_theta, -1, 1))
-    return np.degrees(angle)
-
-def project_points_to_image(points, intrinsics_matrix):
-    image_points = []
-    for point in points:
-        point_homogeneous = np.array([point[0], point[1], point[2]])
-        image_point_homogeneous = intrinsics_matrix @ point_homogeneous
-        image_point = image_point_homogeneous[:2] / image_point_homogeneous[2]
-        image_points.append(image_point)
-    return np.array(image_points)
-
-def get_contour_corners(contour):
-    rect = cv2.minAreaRect(contour)
-    box = cv2.boxPoints(rect)
-    return np.int0(box)
-
-def compute_normals(point_cloud, radius=0.01, max_nn=30):
-    point_cloud.estimate_normals(
-        o3d.geometry.KDTreeSearchParamHybrid(radius=radius, max_nn=max_nn)
-    )
-    return point_cloud
-
-def filter_points_by_angle(point_cloud, axis, max_angle_degrees):
-    max_angle_rad = np.deg2rad(max_angle_degrees)
-    cos_max_angle = np.cos(max_angle_rad)
-    normals = np.asarray(point_cloud.normals)
-    
-    axis_dot_normals = normals @ axis
-    mask = axis_dot_normals <= cos_max_angle
-    filtered_points = point_cloud.select_by_index(np.where(mask)[0])
-
-    return filtered_points
-
-
 
 
 pp = PreProcess()
-
+# Get current folder
+curr_dir = os.path.dirname(os.path.abspath(__file__))
+curr_dir = os.path.join(curr_dir, "for_miki")
 # Create list of image filenames
-rgb_images = [f'./testing/first data set/{img}' for img in os.listdir("./testing/first data set") if img.startswith("rgb_image")]
+rgb_images = [os.path.join(curr_dir, img) for img in os.listdir(curr_dir) if img.startswith("rgb_image")]
 
 # Loop through the images
 for image in rgb_images:
+    print(image)
     img = cv2.imread(image)
     depth = np.fromfile(image.replace("rgb_image", "depth_image").replace("png", "raw"), dtype=np.uint16)
     # Reconstruct the depth map
@@ -157,71 +111,106 @@ for image in rgb_images:
     filtered_depth_data = cv2.medianBlur(depth, 5)
     
     # Get the point cloud
-    point_cloud = depth_to_point_cloud(filtered_depth_data, pp.mtx)
+    point_cloud = pp._depth_image_to_point_cloud(depth)
     
-    # Filter out the floor
-    filtered_point_cloud = point_cloud
-
+    # Remove background - Set pixels below the threshold as black
+    grey_color = 0
+    depth[np.where((depth > 1000) | (depth < 10))] = grey_color
     
+    # Convert the depth image to a point cloud
+    point_cloud = pp._depth_image_to_point_cloud(depth)
     min_angle_diff = float("inf")
     best_plane_inliers = None
     best_plane_normal_vector = None
     for i in range(5):
         # Apply RANSAC to segment planes from the point cloud.
-        plane_model, inliers = point_cloud.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=1000)
+        plane_model, inliers = point_cloud.segment_plane(distance_threshold=0.008, ransac_n=8, num_iterations=10000)
+        display_inlier_outlier_points(point_cloud, inliers, i, title='Inlier and Outlier Points')
 
-         # Calculate the normalized normal vector
+        # Calculate the normalized normal vector from the plane
         normal_vector = plane_model[:3] / np.linalg.norm(plane_model[:3])
         # Calculate the angle between the normal vector and the vertical direction (in degrees)
         angle_y = np.degrees(np.arccos(np.dot(normal_vector, np.array([1, 0, 0])))) # Our camera is turned, so the floor is on the horizontal
         angle_x = np.degrees(np.arccos(np.dot(normal_vector, np.array([0, 0, 1])))) # the closer to zero the closer to being orthogonal to the cameras optical axis
-        print(angle_x, angle_y)
+        
+        # Parameters for filtering planes
+        min_distance_from_camera = 0.2  # In meters
+        min_cardboard_area = 80000
+        min_cardboard_normal_angle = 35
+
         # Remove the floor and noisy data
-        if angle_y < 35 or len(inliers) < 800:
-            # Extract the plane points and remove them from the point cloud.
-            plane_points = point_cloud.select_by_index(inliers)
+        plane_points = point_cloud.select_by_index(inliers)
+        mean_point = np.mean(np.asarray(plane_points.points), axis=0)
+
+        # Calculate distance from the camera
+        distance_from_camera = np.linalg.norm(mean_point)
+
+        if (angle_y < min_cardboard_normal_angle or
+            len(inliers) < min_cardboard_area or
+            distance_from_camera < min_distance_from_camera):
+            # Remove the plane points from the point cloud.
             point_cloud = point_cloud.select_by_index(inliers, invert=True)
             continue
-        if len(inliers) == 0:
-            break  # No more planes found
+        # Find the angle difference to the camera's optical axis
         angle_diff = abs(angle_x)
         if angle_diff < min_angle_diff:
             min_angle_diff = angle_diff
             # Extract the plane points and remove them from the point cloud.
             best_plane_inliers = point_cloud.select_by_index(inliers)
             best_plane_normal_vector = point_cloud.select_by_index(inliers, invert=True)
-    
-    inlier_cloud = filtered_point_cloud.select_by_index(best_plane_inliers)
-    inlier_points = np.asarray(inlier_cloud.points)
-    
-    projected_points = project_points_to_image(inlier_points, pp.mtx)
-    
-    binary_image = np.zeros(img.shape[:2], dtype=np.uint8)
-    for point in projected_points:
-        binary_image[int(point[1]), int(point[0])] = 255
 
-    contours, _ = cv2.findContours(binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    # Extract the best ones
+    plane_points = best_plane_inliers
+    point_cloud = best_plane_normal_vector
+    
+    # Remove points with low depth values (e.g., less than 0.1 meters)
+    background_mask = np.asarray(point_cloud.points)[:, 2] > 0.1
+    point_cloud = point_cloud.select_by_index(np.where(background_mask)[0])
+
+    # Project the plane points back onto the image plane.
+    plane_points_image = pp._project_points_to_image(np.asarray(plane_points.points))
+
+    # Filter out points with coordinates outside the image bounds.
+    valid_indices = np.where((plane_points_image[:, 0] >= 0) & (plane_points_image[:, 0] < img.shape[1]) &
+                        (plane_points_image[:, 1] >= 0) & (plane_points_image[:, 1] < img.shape[0]))[0]
+    valid_points_image = plane_points_image[valid_indices]
+    
+    # Create binary mask
+    plane_mask = np.zeros_like(img)
+    plane_mask[valid_points_image[:, 1].round().astype(int), valid_points_image[:, 0].round().astype(int)] = 255
+    # Remove noise
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9,9))
+    eroded = cv2.erode(cv2.cvtColor(plane_mask, cv2.COLOR_RGB2GRAY), kernel, iterations=3)
+    dilated = cv2.dilate(eroded, kernel, iterations=7)
+    # Get the convex hull
+    contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     largest_contour = max(contours, key=cv2.contourArea)
-    box_corners = get_contour_corners(largest_contour)
+    hull = cv2.convexHull(largest_contour)
     
-    width, height = 400, 300  # Define the desired dimensions of the target plane
-    target_corners = np.array([
-        [0, 0],
-        [width - 1, 0],
-        [width - 1, height - 1],
-        [0, height - 1]
-    ], dtype=np.float32)
+    # Approximate the convex hull with a polygonal curve
+    epsilon = 0.08 * cv2.arcLength(hull, True)
+    approx = cv2.approxPolyDP(hull, epsilon, True)
     
-    homography, _ = cv2.findHomography(box_corners, target_corners)
-    
-    warped_image = cv2.warpPerspective(img, homography, (width, height))
+    if len(approx) == 4:
+        corners = np.squeeze(approx)
+    else:
+        # Fallback in case the contour approximation doesn't result in 4 points
+        print(f"Warning: Found {len(approx)} points instead of 4. Using the 4 most extreme points as corners.")
+        corners = np.zeros((4, 2), dtype=np.float32)
+        corners[0] = tuple(largest_contour[largest_contour[:, :, 0].argmin()][0])  # leftmost point
+        corners[1] = tuple(largest_contour[largest_contour[:, :, 1].argmin()][0])  # topmost point
+        corners[2] = tuple(largest_contour[largest_contour[:, :, 0].argmax()][0])  # rightmost point
+        corners[3] = tuple(largest_contour[largest_contour[:, :, 1].argmax()][0])  # bottommost point
+
+
+    output_image, homography_matrix = pp._transform_image_to_plane_view(img, corners)
     
     
     # Display the results
     display_depth_image(filtered_depth_data, title='Filtered Depth Data')
-    display_projected_points(img, projected_points, title='Projected Points on Image')
-    display_contour_and_corners(img, largest_contour, box_corners, title='Detected Contour and Corners')
-    display_warped_image(warped_image, title='Warped Perspective')
+    #display_projected_points(img, plane_points, title='Projected Points on Image')
+    display_contour_and_corners(img, largest_contour, corners, title='Detected Contour and Corners')
+    display_warped_image(output_image, title='Warped Perspective')
     plt.show()
     
-    display_point_cloud(point_cloud, title='Filtered Point Cloud')
+    #display_point_cloud(point_cloud, title='Filtered Point Cloud')

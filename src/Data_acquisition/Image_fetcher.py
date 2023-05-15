@@ -66,10 +66,15 @@ class ImageFetcher:
             filename = os.path.basename(img_path)
             rgb_images.append({"filename": filename, "image": img})
         return rgb_images
+    
+    
+    
     def get_depth_images(self):
         """Get depth images
         :return: list of tuples (filename, depth image)"""
         return [img[1] for img in tqdm(self.depthImages)]
+    
+    
     def get_rgb_depth_images(self):
         """Get RGB images and depth images that match
         :return: list of tuples (RGB image, depth image)"""
@@ -80,6 +85,15 @@ class ImageFetcher:
             lib[filename] = rgb, img
         return lib
     
+    def _Orientation_test(self):
+        """Get RGB images and depth images that match
+        :return: list of tuples (RGB image, depth image)"""
+        lib = {}
+        for imgpath, img, mask in self.depthImages:
+            filename = os.path.basename(imgpath).replace(".raw","").replace("_depth","")
+            rgb = cv2.imread(imgpath.replace("raw","png").replace("_depth",""))
+            lib[filename] = rgb, img
+        return lib
     
     def alterate_set(self, path2excl):
         """[summary]
@@ -108,10 +122,6 @@ class ImageFetcher:
             # Update the "filenames" column in the DataFrame with the list of filenames
             excl.at[index, 'filenames'] = filenames
         return excl
-    
-
-
-            
             
             
 

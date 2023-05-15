@@ -16,7 +16,7 @@ def display_image(warped_image, title='Warped Image'):
 
 if __name__ == "__main__":
     # start the models
-    segmentor = Segmentation(DEVICE='cpu')
+    segmentor = Segmentation()
     pp = PreProcess()
     
     # load the images

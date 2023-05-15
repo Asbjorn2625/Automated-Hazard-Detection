@@ -21,32 +21,50 @@ class Segmentation:
         self.Lithiummodel= None
         self._load_models(model_type=model_type)
 
-    def _load_models(self, model_type="Dice_Loss"):
+    def _load_models(self, model_type=None):
             # Load all the model and set it to evaluation mode
             dir_folder = os.path.dirname(os.path.abspath(__file__))
             #First up is the Hazard model
             self.Hazardmodel = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.DEVICE)
-            self.Hazardmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_hazard{model_type}.pth"))["state_dict"])
+            if model_type != None:
+                self.Hazardmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_hazard{model_type}.pth"))["state_dict"])
+            else:
+                self.Hazardmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_hazardCombinedLoss.pth"))["state_dict"])
             self.Hazardmodel.eval()
             #Next up is the UN model
             self.UNmodel = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.DEVICE)
-            self.UNmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_UN_circle{model_type}.pth"))["state_dict"])
+            if model_type != None:
+                self.UNmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_UN_circle{model_type}.pth"))["state_dict"])
+            else:
+                self.UNmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_UN_circleCrossEntropy.pth"))["state_dict"])
             self.UNmodel.eval()
             #CAO model
             self.CAOmodel = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.DEVICE)
-            self.CAOmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_CAO{model_type}.pth"))["state_dict"])
+            if model_type != None:
+                self.CAOmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_CAO{model_type}.pth"))["state_dict"])
+            else:
+                self.CAOmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_CAOCrossEntropy.pth"))["state_dict"])
             self.CAOmodel.eval()
             #Proper shipping NAme
             self.PSmodel = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.DEVICE)
-            self.PSmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_Shipping{model_type}.pth"))["state_dict"])
+            if model_type != None:
+                self.PSmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_Shipping{model_type}.pth"))["state_dict"])
+            else:
+                self.PSmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_ShippingCrossEntropy.pth"))["state_dict"])
             self.PSmodel.eval()
             #this side up
             self.TSUmodel = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.DEVICE)
-            self.TSUmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_this_side_up{model_type}.pth"))["state_dict"]) 
+            if model_type != None:
+                self.TSUmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_this_side_up{model_type}.pth"))["state_dict"])
+            else:
+                self.TSUmodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_this_side_upDice_loss.pth"))["state_dict"])
             self.TSUmodel.eval()
             #Lithium
             self.Lithiummodel = UNET(in_channels=3, out_channels=1, features=[32, 64, 128, 256]).to(self.DEVICE)
-            self.Lithiummodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_Lithium{model_type}.pth"))["state_dict"])
+            if model_type != None:
+                self.Lithiummodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_Lithium{model_type}.pth"))["state_dict"])
+            else:
+                self.Lithiummodel.load_state_dict(torch.load(os.path.join(dir_folder, f"models/UNET_LithiumDice_loss.pth"))["state_dict"])
             self.Lithiummodel.eval()
             print("Models loaded")
             

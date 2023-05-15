@@ -1,8 +1,11 @@
 import torch
 import torchvision
-from utils.dataset import Dataset
+import sys
+sys.path.append('/workspaces/P6-Automated-Hazard-Detection')
+sys.path.append('/workspaces/Automated-Hazard-Detection')
+from Libs.final_unet.utils.dataset import Dataset
+from Libs.final_unet.utils.model import UNET
 from torch.utils.data import DataLoader
-from utils.model import UNET
 
 
 def save_checkpoint(state, filename="TrainingModel.pth"):

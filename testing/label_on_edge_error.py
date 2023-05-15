@@ -323,7 +323,7 @@ def hough(cnt):
 
 
 # Replace 'your_folder_path' with the actual path to your folder containing images
-mask_folder_path = 'testing/Out_cropped_hazard_rgb'
+mask_folder_path = 'testing/labels_on_the_edge'
 
 
 
@@ -355,13 +355,13 @@ for file in file_list:
             # check if the area is greater than or equal to 1000
             if area >= 1000:
 
-                #labels_on_edge(cnt)
+                labels_on_edge(cnt)
 
                 #label_oriention(cnt)
                 
                 #convex(cnt)
                 
-                hough(cnt)
+                #hough(cnt)
         
 
                 break

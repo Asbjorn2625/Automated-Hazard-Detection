@@ -64,7 +64,7 @@ class PreProcess:
         best_plane_normal_vector = None
         for i in range(max_planes):
             # Apply RANSAC to segment planes from the point cloud.
-            plane_model, inliers = point_cloud.segment_plane(distance_threshold=0.008, ransac_n=5, num_iterations=10000)
+            plane_model, inliers = point_cloud.segment_plane(distance_threshold=0.008, ransac_n=8, num_iterations=10000)
 
             # Calculate the normalized normal vector from the plane
             normal_vector = plane_model[:3] / np.linalg.norm(plane_model[:3])
@@ -122,7 +122,7 @@ class PreProcess:
         # Remove noise
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9,9))
         eroded = cv2.erode(cv2.cvtColor(plane_mask, cv2.COLOR_RGB2GRAY), kernel, iterations=3)
-        dilated = cv2.dilate(eroded, kernel, iterations=7)
+        dilated = cv2.dilate(eroded, kernel, iterations=5)
         # Get the convex hull
         contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         largest_contour = max(contours, key=cv2.contourArea)
@@ -156,18 +156,51 @@ class PreProcess:
             return output_image, homography_matrix, output_mask
         
       
-    def transformed_to_original_pixel(self, transformed_pixel, homography_matrix):
+    def transformed_to_original_pixel(self, image, transformed_pixel, homography_matrix):
         """
         Convert pixel coordinates in the transformed image back to the original image.
+        :param: image: np.ndarray, the original image
         :param transformed_pixel: tuple or np.ndarray, (x, y) coordinates in the transformed image
         :param homography_matrix: np.ndarray, the homography matrix used to transform the original image
         :return: np.ndarray, (x, y) coordinates in the original image
         """
+        # Remove the black box
+        new_x, new_y = self._remove_black_box(image, transformed_pixel[0], transformed_pixel[1])
+        transformed_pixel = np.array([new_x, new_y])
+        # Get the pixel value in the original image
         transformed_pixel = np.array([*transformed_pixel, 1])
         original_pixel = np.linalg.inv(homography_matrix) @ transformed_pixel
         original_pixel = original_pixel / original_pixel[2]
         return original_pixel[:2].round().astype(int)
-        
+
+    def _remove_black_box(self, image, original_x, original_y):
+        # Convert the image to grayscale
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Threshold the image (all pixels with intensity > 0 will become white)
+        _, thresh = cv2.threshold(gray, 1, 255, cv2.THRESH_BINARY)
+
+        # Find the contours in the binary image
+        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Find the largest contour (assuming it's the content of the image)
+        max_area = 0
+        best_cnt = None
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area > max_area:
+                max_area = area
+                best_cnt = cnt
+
+        # Find the bounding rectangle of the largest contour
+        x, y, w, h = cv2.boundingRect(best_cnt)
+
+        # Get the new coordinates in the cropped image
+        cropped_x = original_x - x
+        cropped_y = original_y - y
+
+        return cropped_x, cropped_y
+
     def segmentation_to_ROI(self, image):
         grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         ret, thr = cv2.threshold(grey, 0, 200, cv2.THRESH_BINARY)
@@ -266,7 +299,7 @@ class PreProcess:
         
         if transformed_image.shape[0] > rgb_background.shape[0] or transformed_image.shape[1] > rgb_background.shape[1]:
             # The transformed image is larger than the background
-            return rgb_image, np.eye(3) if mask is None else (rgb_image, np.eye(3), mask)
+            return (rgb_image, np.eye(3)) if mask is None else (rgb_image, np.eye(3), mask)
         
         # Put the transformed image in the center of the black background
         rgb_background[start_y:start_y+transformed_image.shape[0], start_x:start_x+transformed_image.shape[1]] = transformed_image
@@ -281,4 +314,18 @@ class PreProcess:
         mask_background[start_y:start_y+transformed_mask.shape[0], start_x:start_x+transformed_mask.shape[1]] = transformed_mask
         
         return rgb_background, homography_matrix, mask_background
+    
+    
+    def get_pixelsize(self, depth):
+        """
+        Calculates the pixel size at a certain distance
+        :param depth: The depth image, as a numpy.ndarray (dtype=np.uint16)
+        :return width: np.ndarray
+        :return height: np.ndarray
+        """
+        fov = np.deg2rad([69, 42])
+        # 2 * depth * tan(FOV / 2) * (object width in pixels / image width in pixels)
+        pixle_width = 2 * depth * np.tan(fov[0]/2)/1920
+        pixle_height = 2 * depth * np.tan(fov[1]/2)/1080
+        return pixle_width, pixle_height
         

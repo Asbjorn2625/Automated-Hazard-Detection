@@ -117,7 +117,6 @@ for line in lines:
 
             # Draw the colored component on top of the original image
             color_img = cv.addWeighted(color_img, 1, component_colored, 0.5, 0)
-
             number_of_components +=1
 
 

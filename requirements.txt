@@ -10,3 +10,4 @@ keras
 pytesseract
 craft-text-detector
 open3d
+Levenshtein
