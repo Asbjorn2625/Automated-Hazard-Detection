@@ -10,9 +10,9 @@ from src.Classification.Classy import Classifier
 
 @Classifier
 class Hazard_labels:
-    def __init__(self, ocr_model):
+    def __init__(self, ocr_model, preprocessor):
         # Initialize the parent class
-        super.__init__(ocr_model)
+        super.__init__(ocr_model, preprocessor)
 
     def classify(self, image, depth_map, mask, homography):
         # Put the classification code here
