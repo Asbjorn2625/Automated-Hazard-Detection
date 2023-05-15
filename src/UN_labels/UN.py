@@ -1,33 +1,57 @@
-import sys
-import os
 import cv2
-import json
-import re
-sys.path.append(os.getcwd().replace("\\", "/") + "/src")
-from Text_reader.ReaderClass import ReadText
-from Segmentation.segmentation import Segmentation
-from Data_acquisition.Image_fetcher import ImageFetcher
-from Preprocess.prep import PreProcess
 import numpy as np
+import math
+import sys
 
+sys.path.append("/workspaces/P6-Automated-Hazard-Detection")
+sys.path.append("/workspaces/Automated-Hazard-Detection")
+from src.Classification.Classy import Classifier
+
+@Classifier
 class UNLabels:
-    def __init__(self):
-      self.reader = ReadText()
-      self.list = []
+    def __init__(self, ocr_model):
+        # Initialize the parent class
+        super.__init__(ocr_model)
 
-    def unLogo(self, image):
-        cv2.imshow(image)
-        cv2.waitKey(0)
-    def packagingCodes(self,image):
+    def classify(self, image, depth_map, mask, homography):
+        ##### Put the classification code here ####
+        
+        # get the bounding box of the text
+        boxes = self.reader.findText(image)
+        # read the text
+        for box in boxes:
+            # Get the size of the text
+            text_size = self._get_size(box, image, depth_map, homography)
+            # read the text
+            text = self.reader.readText(image, box)  # Maybe consider changing the whitelist here to only cover the letters in the proper shipping name
+    
+    
+    def _get_size(self, text_box, image, depth_map, homography):
+        # Get the corners of the text box
+        bbox = np.array(text_box)
+
+        # Find the top and bottom points
+        top_point = min(bbox, key=lambda point: point[1])
+        bottom_point = max(bbox, key=lambda point: point[1])
+
+        corners = [top_point, bottom_point]
+        
+        # Change the corners into the original image
+        corner_groups = [self.pp.transformed_to_original_pixel(image, pixel, homography) for pixel in corners]
+        
+        # Calculate the distances between consecutive corners
+        corner1 = corner_groups[0]
+        corner2 = corner_groups[1]  # Get the next corner in the group
+        distance = self._distance_between_corners(corner1, corner2, depth_map)
+
+        return distance
+        
+    # Asbjørn version of reading the UN number
+    def packagingCodes(self,text_list):
         import re
         pattern = r"^\d+\w+\/\w+\d(\.\d)*\/(\w)?"
-        text= []
         Package = []
-        bounding = self.reader.findText(image)
-        config='-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./- --psm 6 --oem 3'
-        for boxes in bounding:
-            text.append(self.reader.readText(image, boxes,config=config))
-        for txt in text:
+        for txt in text_list:
             match = re.match(pattern, txt)
             if match:
                 found=match.group(0).split("/")
@@ -36,26 +60,3 @@ class UNLabels:
                 solid = True if found[2] == "S" else False
                 Package.append([PackageType, certification, solid])
         return Package
-
-""""""
-segsy = Segmentation()
-fetcher = ImageFetcher(os.getcwd().replace("\\", "/") + "/Dataset")
-img_lib = fetcher.get_rgb_depth_images()
-PreProcesser = PreProcess()
-UN = UNLabels()
-
-for filename, (rgb_img, depth_img) in img_lib.items():
-    segs_image = segsy.locateUN(rgb_img)
-    segs_image = cv2.bitwise_and(rgb_img, segs_image)
-    if cv2.mean(segs_image) != 0:
-        tran_img = PreProcesser.transform(segs_image)
-        for bounds in tran_img:
-            cropped = segs_image[bounds[1]:bounds[3], bounds[0]:bounds[2]]
-            enhance = PreProcesser.image_enhancer(cropped)
-            logo= UN.unLogo(cropped)
-            
-        mask = np.where((depth_img > 1000) | (depth_img < 10), 0, 255).astype(np.uint8)
-        masked = cv2.bitwise_and(rgb_img, rgb_img, mask=mask)
-        UNinv= cv2.bitwise_not(segs_image)
-        masked = cv2.bitwise_and(masked, UNinv)
-        print("Text found" + str(UN.packagingCodes(masked)))

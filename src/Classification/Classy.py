@@ -6,9 +6,11 @@ sys.path.append('/workspaces/Automated-Hazard-Detection')
 sys.path.append('/workspaces/P6-Automated-Hazard-Detection')
 from src.Text_reader.ReaderClass import ReadText
 
-class classifier():
-    def __init__(self):
-        pass
+class Classifier():
+    def __init__(self, ocr_model, preprocess_model):
+        self.reader = ocr_model
+        self.ocr_results = {"OCR_dic": {}}
+        self.pp = preprocess_model
         
     def calc_cnt(self,img):
         contours, hierachy = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
