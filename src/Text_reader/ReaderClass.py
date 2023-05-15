@@ -67,7 +67,7 @@ class ReadText:
         :param image: image to extract the text from
         :param box: bounding box of the text area(Recommended to be found through scene detection such as CRAFT)
         :param display: True for cv2 display, false for not
-        :param config: config string for the tesseract, defaults to Block letters with psm 6 and oem 3
+        :param config: config string for the tesseract, defaults to Block letters with psm 7 and oem 3
         :param padding: How much padding should be added to the bounding box, default 10 pixels
         :return: returns the text found
         """
