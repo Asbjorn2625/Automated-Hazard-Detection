@@ -7,6 +7,7 @@ import torch.utils
 import sys
 import os
 sys.path.append("/workspaces/P6-Automated-Hazard-Detection")
+sys.path.append("/workspaces/Automated-Hazard-Detection")
 from Libs.final_unet.utils.model import UNET
 
 class Segmentation:
@@ -70,7 +71,7 @@ class Segmentation:
         # Perform a forward pass and create a binary segmentation mask
         with torch.no_grad():
             preds = torch.sigmoid(model(x))
-            preds = (preds > 0.5).float()
+            preds = (preds > 0.8).float()
         preds = preds.cpu().numpy()
         if preds.shape[0] == 1:
             preds = preds.squeeze(0)
