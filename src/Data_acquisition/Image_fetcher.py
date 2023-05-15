@@ -122,11 +122,7 @@ class ImageFetcher:
             # Update the "filenames" column in the DataFrame with the list of filenames
             excl.at[index, 'filenames'] = filenames
         return excl
-<<<<<<< HEAD
-
-=======
             
->>>>>>> 6a8399afcf170f3f74ad73a7203fb284e9085b3d
             
 
 
