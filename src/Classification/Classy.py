@@ -6,9 +6,11 @@ sys.path.append('/workspaces/Automated-Hazard-Detection')
 sys.path.append('/workspaces/P6-Automated-Hazard-Detection')
 from src.Text_reader.ReaderClass import ReadText
 
-class classifier():
-    def __init__(self):
-        pass
+class Classifier:
+    def __init__(self, ocr_model, preprocess_model):
+        self.reader = ocr_model
+        self.ocr_results = {"OCR_dic": {}}
+        self.pp = preprocess_model
         
     def calc_cnt(self,img):
         contours, hierachy = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -67,7 +69,7 @@ class classifier():
             return round(angle_deg,2)
         else:
             return None
-    def detect_package_orientation(image, Display=False):
+    def detect_package_orientation(self, image, Display=False):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
         
