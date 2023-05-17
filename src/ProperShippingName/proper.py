@@ -7,7 +7,6 @@ sys.path.append("/workspaces/P6-Automated-Hazard-Detection")
 sys.path.append("/workspaces/Automated-Hazard-Detection")
 from src.Classification.Classy import Classifier
 
-
 class ProperShippingName(Classifier):
     def __init__(self, ocr_model, preprocessor):
         # Initialize the parent class

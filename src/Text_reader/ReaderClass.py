@@ -185,6 +185,11 @@ class ReadText:
         
         # Extract the text through the tesseract
         text = pytesseract.image_to_string(segmented, config=config)
+        if len(text.strip()) < 3:
+            segmented = cv2.rotate(segmented, cv2.ROTATE_90_CLOCKWISE)
+           
+            text = pytesseract.image_to_string(segmented, config=config)
+    
         return text.strip() if not RETURN_PIXEL_HEIGHT else text.strip(), points
     
     

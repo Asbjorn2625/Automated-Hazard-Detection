@@ -8,11 +8,11 @@ sys.path.append("/workspaces/P6-Automated-Hazard-Detection")
 sys.path.append("/workspaces/Automated-Hazard-Detection")
 from src.Classification.Classy import Classifier
 
-@Classifier
-class HandlingLabels():
+
+class HandlingLabels(Classifier):
     def __init__(self, ocr_model, preprocessor):
         # Initialize the parent class
-        super.__init__(ocr_model, preprocessor)
+        super().__init__(ocr_model, preprocessor)
     
     def classify(self, image, depth_map, mask, homography):
         # Put the classification code here

@@ -13,7 +13,7 @@ classy = classifier()
 def format_degree(value):
         return f"{value}$^\circ$"
 
-def detect_orientation(image,Display=False):
+def detect__package_orientation(image,Display=False):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
     
