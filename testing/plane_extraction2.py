@@ -103,13 +103,6 @@ for image in rgb_images:
     img = pp.undistort_images(img)
     depth = pp.undistort_images(depth)
     
-    # Preprocess the depth data
-    # Apply a bilateral filter
-    #filtered_depth_data = depth_biliteral(depth)
-
-    # Optionally, apply a median filter
-    filtered_depth_data = cv2.medianBlur(depth, 5)
-    
     # Get the point cloud
     point_cloud = pp._depth_image_to_point_cloud(depth)
     

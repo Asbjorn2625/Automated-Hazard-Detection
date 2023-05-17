@@ -28,9 +28,10 @@ class ReadText:
         equalized = cv2.equalizeHist(gray)
 
         # Apply CLAHE
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        clahe = cv2.createCLAHE(clipLimit=5.0, tileGridSize=(30,30))
         clahe_img = clahe.apply(gray)
-
+        
+        
         # Apply contrast stretching
         # Compute min and max pixel values
         min_val, max_val = np.min(gray), np.max(gray)
@@ -45,6 +46,7 @@ class ReadText:
         clahe_result = self.craft.detect_text(clahe_img.copy())
         stretched_result = self.craft.detect_text(stretched.copy())
 
+        
         combined_boxes = []
         combined_boxes.extend(equalized_result["boxes"])
         combined_boxes.extend(img_result["boxes"])
@@ -121,12 +123,10 @@ class ReadText:
 
 
         _, thresh = cv2.threshold(resized_image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-        showing_thres2 = thresh.copy()
         
         # White text on black background
         if np.sum(thresh > 100) > np.sum(thresh < 100):
             thresh = cv2.bitwise_not(thresh) 
-            showing_thres = thresh.copy()
 
             kernel = np.ones((3, 3), np.uint8)  # Increase the kernel size
             eroded_image = cv2.erode(thresh, kernel, iterations=2)
@@ -160,10 +160,6 @@ class ReadText:
                 points = np.array([[xmin+x, ymin+y],[xmin+x, ymin+y+h]])
             else:
                 points = np.array([0, 0])
-                
-             
-            
-            
 
         segmented = cv2.bitwise_not(segmented)    
             
@@ -345,3 +341,8 @@ def aabb_to_quadrilateral(box):
     return [[x, y], [x+w, y], [x+w, y+h], [x, y+h]]
 
 
+def adjust_gamma(image, gamma=1.0):
+    invGamma = 1.0 / gamma
+    table = np.array([((i / 255.0) ** invGamma) * 255
+        for i in np.arange(0, 256)]).astype("uint8")
+    return cv2.LUT(image, table)
