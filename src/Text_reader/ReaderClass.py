@@ -135,6 +135,9 @@ class ReadText:
         # Remove edge blobs
         segmented = self._remove_edge_blobs(dilated_image)
         
+        if np.sum(segmented) == 0:
+            return ""
+        
         segmented = cv2.bitwise_not(segmented)
         
         #angle = self._get_rotation_angle(segmented)
@@ -160,6 +163,11 @@ class ReadText:
         
         # Extract the text through the tesseract
         text = pytesseract.image_to_string(segmented, config=config)
+        if len(text.strip()) < 3:
+            segmented = cv2.rotate(segmented, cv2.ROTATE_90_CLOCKWISE)
+           
+            text = pytesseract.image_to_string(segmented, config=config)
+    
         return text.strip()
     
     

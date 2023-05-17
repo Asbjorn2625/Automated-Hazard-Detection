@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import math
+import Levenshtein
 import sys
 
 sys.path.append("/workspaces/P6-Automated-Hazard-Detection")
@@ -8,11 +9,26 @@ sys.path.append("/workspaces/Automated-Hazard-Detection")
 from src.Classification.Classy import Classifier
 
 
-@Classifier
-class Hazard_labels:
+class Hazard_labels(Classifier):
     def __init__(self, ocr_model, preprocessor):
         # Initialize the parent class
-        super.__init__(ocr_model, preprocessor)
+        super().__init__(ocr_model, preprocessor)
+
+        self.classes = {"Explosives": ["EXPLOSIVE","1", "1.1","1.2","1.3","1.4","1.5","1.6"],
+        "Flammable Gas": ["FLAMMABLE","GAS","FLAMMABLE GAS","2","2.1"],
+        "Non-flammable gas": ["NON-FLAMMABLE","GAS","2","2.1"],
+        "Toxic Gas": ["TOXIC","GAS","TOXIC GAS","2","2.3"],
+        "Flammable Liquid": ["Flammable Liquid","Flammable", "Liquid","3"],
+        "Flammable Solid": ["FLAMMABLE", "SOLID", "FLAMMABLE SOLID","4","4.1"],
+        "Spontaneosly Combustible": ["SPONTANEOUSLY COMBUSTIBLE","SPONTANEOUSLY", "COMBUSTIBLE","4","4.2"],
+        "Dangerous When Wet": ["DANGEROUS","WHEN", "WET","DANGEROUS WHEN WET", "4","4.3"],
+        "Oxidizing Agent": ["OXIDISING","AGENT","OXIDISING AGENT","5","5.1"],
+        "Organic Peroxides": ["ORGANIC", "PEROXIDES","ORGANIC PEROXIDES","5","5.2"],
+        "Toxic": ["TOXIC","6","6.1"],
+        "Infectous Substance": ["INFECTIOUS","SUBSTANCE","INFECTIOUS SUBSTANCE", "6","6.2"],
+        "Corrosive": ["CORROSIVE","8"],
+        "Miscellanous": ["MISCELLANEOUS","9"],
+        "Lithium Batteries": ["LITHIUM BATTERIES", "9"]}
 
     def classify(self, image, depth_map, mask, homography):
         # Put the classification code here
@@ -106,3 +122,48 @@ class Hazard_labels:
             average_distance = sum(side_distances) / num_corners
 
         return average_distance
+    def written_material(self, rgb_img, mask_img):
+        writtenText=[]
+        masked=cv2.bitwise_and(rgb_img, rgb_img, mask=mask_img)
+        ROI=self.pp.segmentation_to_ROI(mask_img)
+        for bounds in ROI:
+            cropped = masked[bounds[1]:bounds[3], bounds[0]:bounds[2]]
+            self.reader.findText(cropped)
+            bounding = self.reader.findText(cropped)
+            config='-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\ ./- --psm 7 --oem 3'
+            for boxes in bounding:
+                predtext= self.reader.readText(cropped, boxes,config=config)
+                writtenText.append(predtext)
+        if len(writtenText) == 0:
+            return "No text found"
+        else:
+            return self._find_closest_match(writtenText, self.classes)[1]
+    def _find_closest_match(self, input_list, DGRlist):
+        scores = []
+        for key, value in DGRlist.items():
+            similarity = 0
+            for word in value:
+                for input_word in input_list:
+                    if ((word != "" and input_word != "") and ((not input_word.replace(".","").isdigit()) and (not word.replace(".","").isdigit()))) and len(input_word) > 2:
+                        if Levenshtein.distance(word, input_word) <= 2:
+                            similarity += 1
+                            
+                    elif (word != "" and input_word != "") and (input_word.replace(".","").isdigit() and word.replace(".","").isdigit()):
+                        if word == input_word:
+                            """ 
+                            print("word: ", word, "input_word: ", input_word)
+                            """
+                            similarity += 1
+            if similarity > 0:
+                scores.append((key, similarity))
+            
+
+        if scores:
+            max_score = max(scores, key=lambda x: x[1])
+            max_score_value = max_score[1]
+            max_score_indices = [i for i, score in enumerate(scores) if score[1] == max_score_value]
+            keys_with_highest_scores = [scores[i][0] for i in max_score_indices]
+
+            return scores, keys_with_highest_scores
+        else:
+            return scores, ""

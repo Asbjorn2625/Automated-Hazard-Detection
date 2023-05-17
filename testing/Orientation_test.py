@@ -64,5 +64,6 @@ for filename, (rgb_img, depth_img) in imglib.items():
         continue
 
 
+
 df = pd.DataFrame(columns)
 print(df.to_latex(index=False,escape=False))

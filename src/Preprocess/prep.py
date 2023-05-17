@@ -202,9 +202,7 @@ class PreProcess:
         return cropped_x, cropped_y
 
     def segmentation_to_ROI(self, image):
-        grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        ret, thr = cv2.threshold(grey, 0, 200, cv2.THRESH_BINARY)
-        contours, hierarchy = cv2.findContours(thr, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, hierarchy = cv2.findContours(image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         Roi = []
         for cnt in contours:
             # Get the bounding rectangle of the contour
