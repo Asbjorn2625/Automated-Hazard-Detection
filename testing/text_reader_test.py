@@ -157,14 +157,13 @@ def readText(image, box, display=True, config='-c tessedit_char_whitelist=ABCDEF
         _, mask = cv2.threshold(norm_grad, 50, 255, cv2.THRESH_BINARY)  # adjust the threshold as needed
         # create a vertical line kernel
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 5))
-        # Dialate and erode the mask
-        mask = cv2.dilate(mask, kernel, iterations=1)
+        # Dialate and erode the mask to remove noise
         mask = cv2.erode(mask, kernel, iterations=3)
         
         # Use Hough Line Transform to find lines in the gradient image
         lines = cv2.HoughLinesP(mask, 1, np.pi / 180, 20, None, 30, 5)
         # Initialize an empty list to store the y-coordinates of the lines
-        y_coords = []
+        y_coords = [0]
 
         # create color display
         display = equalized.copy()
@@ -175,6 +174,8 @@ def readText(image, box, display=True, config='-c tessedit_char_whitelist=ABCDEF
                 l = lines[i][0]
                 y_coords.append(l[0])
                 cv2.line(display, (l[0], l[1]), (l[2], l[3]), (0,0,255), 3, cv2.LINE_AA)
+        y_coords.append(equalized.shape[1])
+        y_coords = list(set(y_coords))
         # display equalized image
         cv2.imshow("Equalized", display)
         cv2.waitKey(0)
@@ -184,11 +185,12 @@ def readText(image, box, display=True, config='-c tessedit_char_whitelist=ABCDEF
         # Use the y-coordinates to segment the image into individual sections
         sections = [equalized[:, int(y_coords[i]):int(y_coords[i+1])] for i in range(len(y_coords)-1)]
 
-        # Now you can process each section individually
+        new_image = np.zeros_like(equalized)
+        # Process each section
         for i, section in enumerate(sections):
-            # Apply some processing to 'section'...
-            # For example, you could apply a different threshold to each section:
+            section = equalized[:, int(y_coords[i]):int(y_coords[i+1])]
             _, section_thresh = cv2.threshold(section, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            new_image[:, int(y_coords[i]):int(y_coords[i+1])] = section_thresh
             # Save the processed section to a file
             cv2.imshow(f"thresh{i}", section_thresh)
             cv2.waitKey(0)
@@ -197,7 +199,7 @@ def readText(image, box, display=True, config='-c tessedit_char_whitelist=ABCDEF
         if display:
             cv2.imshow("segmented image", segmented)
             cv2.imshow("thresh", equalized)
-            cv2.imshow("cropped", cropped_image)
+            cv2.imshow("cropped", new_image)
             cv2.imshow("thres", thresh)
             cv2.waitKey(0)
             
