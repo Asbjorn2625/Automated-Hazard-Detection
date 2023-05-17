@@ -5,6 +5,7 @@ import torch
 import numpy as np
 import cv2
 import warnings
+import matplotlib.pyplot as plt
 
 # Ignore specific warning
 warnings.filterwarnings("ignore", category=UserWarning, module='torchvision.models._utils')
@@ -36,7 +37,8 @@ class ReadText:
         # Apply contrast stretching
         stretched = (gray - min_val) / (max_val - min_val) * 255
         stretched = np.uint8(stretched)
-        
+
+
         # Detect text regions
         equalized_result = self.craft.detect_text(equalized.copy())
         img_result = self.craft.detect_text(img.copy())
@@ -60,7 +62,7 @@ class ReadText:
         return np.array(final_result)
 
     
-    def readText(self, image, box, display=False, config='-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./- --psm 7 --oem 3', padding=10):
+    def readText(self, image, box, display=True, config='-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./- --psm 7 --oem 3', padding=10, RETURN_PIXEL_HEIGHT = False):
         """
         Function for extracting text given a text area and a image.
         
@@ -101,7 +103,7 @@ class ReadText:
         
         # Rotate the image to follow the horizontal axis
         if cv2.countNonZero(cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY)) < 0:
-            return ""
+            return "" if not RETURN_PIXEL_HEIGHT else "", 0
     
         
         # Convert to grayscale
@@ -119,37 +121,60 @@ class ReadText:
 
 
         _, thresh = cv2.threshold(resized_image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        showing_thres2 = thresh.copy()
         
         # White text on black background
         if np.sum(thresh > 100) > np.sum(thresh < 100):
             thresh = cv2.bitwise_not(thresh) 
+            showing_thres = thresh.copy()
 
             kernel = np.ones((3, 3), np.uint8)  # Increase the kernel size
             eroded_image = cv2.erode(thresh, kernel, iterations=2)
             dilated_image = cv2.dilate(eroded_image, kernel, iterations=1)
+            for_show= dilated_image.copy
         else:
             kernel = np.ones((3, 3), np.uint8)  # Increase the kernel size
             eroded_image = cv2.erode(thresh, kernel, iterations=1)
             dilated_image = cv2.dilate(eroded_image, kernel, iterations=1)
+            for_show = dilated_image.copy()
         
         # Remove edge blobs
         segmented = self._remove_edge_blobs(dilated_image)
         
-        segmented = cv2.bitwise_not(segmented)
-        
-        #angle = self._get_rotation_angle(segmented)
-        
-        #(h, w) = segmented.shape[:2]
-        #center = (w // 2, h // 2)
-        
-        #M = cv2.getRotationMatrix2D(center, angle, 1.0)
-        #segmented = cv2.warpAffine(segmented, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
-        
+        if cv2.countNonZero(segmented) < 0:
+             return "" if not RETURN_PIXEL_HEIGHT else "", 0
+            
+        #checking for the pixle height of the letters
+        if RETURN_PIXEL_HEIGHT:
+            
+            scale_factor = 3
+            resized_segment = cv2.resize(segmented, (int(segmented.shape[1]/scale_factor), int(segmented.shape[0]/scale_factor)), interpolation=cv2.INTER_LANCZOS4)
+            
+            # Find contours
+            contours, _ = cv2.findContours(resized_segment, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            if len(contours) > 0:
+                # Find the bounding rectangle for the contour
+                x, y, _, h = cv2.boundingRect(contours[0])
+                
+                points = np.array([[xmin+x, ymin+y],[xmin+x, ymin+y+h]])
+            else:
+                points = np.array([0, 0])
+                
+             
+            
+            
+
+        segmented = cv2.bitwise_not(segmented)    
+            
+                
         # Display the process
         if display:
             cv2.imshow("segmented image", segmented)
             cv2.imshow("thresh", gray)
             cv2.imshow("cropped", cropped_image)
+            cv2.imshow("thres", thresh)
+            cv2.imshow("dilate",for_show)
             cv2.waitKey(0)
             
         ratio = gray.shape[1]/gray.shape[0]
@@ -160,7 +185,7 @@ class ReadText:
         
         # Extract the text through the tesseract
         text = pytesseract.image_to_string(segmented, config=config)
-        return text.strip()
+        return text.strip() if not RETURN_PIXEL_HEIGHT else text.strip(), points
     
     
     def _remove_edge_blobs(self, img):
@@ -298,6 +323,8 @@ class ReadText:
             rotation_angle = 90 - rotation_angle
 
         return rotation_angle
+    
+   
 
 def quadrilateral_to_aabb(box):
     """Convert a quadrilateral to an axis-aligned bounding box."""
@@ -311,3 +338,5 @@ def aabb_to_quadrilateral(box):
     """Convert an axis-aligned bounding box to a quadrilateral."""
     x, y, w, h = box
     return [[x, y], [x+w, y], [x+w, y+h], [x, y+h]]
+
+

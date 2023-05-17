@@ -43,6 +43,38 @@ Reading_test_output = os.path.join(current_folder, "reading_test_output.csv")
 # read the CSV file into a DataFrame
 df = pd.read_csv(Reading_test_output)
 
+size_test_df = pd.read_csv(Reading_test_output)
+
+size_test_df = size_test_df.drop(["picturename", "ground_truth_text","background_color","read_text"], axis= 1 )
+
+size_test_df.dropna(subset=['detected_text_size'], inplace=True)
+
+print(size_test_df)
+
+#size_test_df = size_test_df.groupby(["orientation", "size"]).mean()
+
+
+# Use pivot_table to group by 'name' and 'color', then pivot on 'size' and 'value'
+size_test_pivot_df = size_test_df.pivot_table(index='orientation', columns='size', values='detected_text_size', aggfunc='mean').reset_index()
+
+# Rename the columns to make them more understandable
+#size_test_pivot_df.columns.name = None
+
+print(size_test_pivot_df)
+
+print(size_test_pivot_df.keys())
+
+
+# Round the numeric columns to 3 decimal places
+rounded_df_size_test = size_test_pivot_df.round(3)
+
+# Convert the DataFrame to a LaTeX table with controlled float format
+rounded_df_size_test = rounded_df_size_test.to_latex(index=False, float_format="%.3f")
+
+# Print the LaTeX table
+print(rounded_df_size_test)
+
+
 
 testing_df = pd.DataFrame(columns=['picturename', 'size', 'orientation','background_color','read_text','ground_truth_text'])
 
@@ -50,6 +82,7 @@ testing_df = pd.DataFrame(columns=['picturename', 'size', 'orientation','backgro
 sizes = [5.5,5.9,6.1,6.9,7.1,7.9]
 # Now group by 'mask' and 'model', and take the mean of the other columns
 
+df.drop("detected_text_size", axis=1)
 
 df["read_text"] = df["read_text"].apply(levensthein_distance)
 
@@ -63,6 +96,7 @@ df_pivot.columns.name = None
 print(df_pivot)
 
 print(df_pivot.keys())
+
 
 
 df_color = df_pivot.drop("orientation", axis=1)
