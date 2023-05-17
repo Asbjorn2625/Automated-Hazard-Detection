@@ -46,9 +46,11 @@ class Classifier:
         mask1 = self.seg.locateLithium(img)
         mask2 = self.seg.locateCao(img)
         mask3 = self.seg.locateTSU(img)
+        
         lithium = np.max(mask1)
         CAO = np.max(mask2)
         TSU = np.max(mask3)
+
         if lithium == 0:
             lit_res = False
             UN = "NONE"
@@ -65,10 +67,54 @@ class Classifier:
             CAO_res = False
         else:
             CAO_res = True
-        if TSU == 0:
-            TSU_res = False
+        
+        gray_mask = cv2.cvtColor(mask3, cv2.COLOR_BGR2GRAY)
+        contours, _ = cv2.findContours(gray_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        
+        for cont in contours:
+            if cv2.contourArea(cont) < 75:
+                cv2.drawContours(gray_mask, [cont], 0, (0), thickness=-1)
+
+        contours, _ = cv2.findContours(gray_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        if len(contours) == 3:
+            # Initialize maximum length and index
+            max_length = 0
+            max_length_index = 0
+            bounding_rects = []
+
+            # Iterate through each contour
+            for i, cnt in enumerate(contours):
+                # Get the bounding rectangle
+                x, y, w, h = cv2.boundingRect(cnt)
+                bounding_rects.append((x, y, w, h))
+
+                # If this contour is the longest so far, update max_length and max_length_index
+                if h > max_length:
+                    max_length = h
+                    max_length_index = i
+
+            # Compute the x-coordinate of the center of the longest contour
+            longest_contour_center_x = bounding_rects[max_length_index][0] + bounding_rects[max_length_index][2] // 2
+
+            # Iterate through each contour again
+            for i, (x, y, w, h) in enumerate(bounding_rects):
+                if i == max_length_index:
+                    continue
+                
+                # Compute the x-coordinate of the center of the current contour
+                contour_center_x = x + w // 2
+
+                # Compare the x-coordinates of the centers
+                if contour_center_x < longest_contour_center_x:
+                    TSU_res = True
+                elif contour_center_x > longest_contour_center_x:
+                    TSU_res = False
         else:
-            TSU_res = True
+            TSU_res = False
+            
+        
         return lit_res, CAO_res, TSU_res, UN
     
     def image_prep(self, img, depth):
@@ -91,7 +137,7 @@ class Classifier:
         box_count = self.reader.findText(rotated)
         text = []
         for box in box_count:
-            text = text + [self.reader.readText(rotated, box, False)]
+            text = self.reader.readText(rotated, box, False)
             
         return Haz_res, text
     
