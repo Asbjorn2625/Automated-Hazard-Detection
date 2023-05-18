@@ -5,6 +5,7 @@ sys.path.append('/workspaces/P6-Automated-Hazard-Detection')
 from src.Segmentation.segmentation import Segmentation
 from src.Preprocess.prep import PreProcess
 #from src.Data_acquisition.Image_fetcher import ImageFetcher
+from src.ProperShippingName import proper
 
 from src.Text_reader.ReaderClass import ReadText
 import os
@@ -66,6 +67,8 @@ pp = PreProcess()
 
 read = ReadText()
 
+pps = proper.ProperShippingName(None, pp)
+
 i = 0
 
 k = 0
@@ -81,7 +84,7 @@ current_file_path = os.path.abspath(__file__)
 # Get the folder containing the current file
 current_folder = os.path.dirname(current_file_path)
 
-image_folder = os.path.join(current_folder, "Final_reading_test")
+image_folder = os.path.join(current_folder, "first data set")
 
 # Image path
 
@@ -129,12 +132,15 @@ csv_file_path = os.path.join(image_folder, "transformed_images/transformed_image
 df_imges = pd.read_csv(csv_file_path)
 
 # Loop through the images
-for path, transform_path, homography in tqdm(islice(zip(df_imges["image_path"], df_imges["transformed_image_path"], df_imges["homography"]), 0, None), "Reading images"):
+for path, transform_path, homography in tqdm(islice(zip(df_imges["image_path"], df_imges["transformed_image_path"], df_imges["homography"]), 88, None), "Reading images"):
 
     # Load the images
     original_img = cv2.imread(path)
     trans_img = cv2.imread(transform_path)
+    depth_data = np.fromfile(path.replace("rgb_image", "depth_image").replace("png", "raw"), dtype=np.uint16)
+    depth_data = depth_data.reshape(int(1080), int(1920))
     
+    depth_data = pp.undistort_images(depth_data)
 
     # Remove brackets and newlines, and replace multiple spaces with single spaces
     homography = re.sub('\s+', ' ', homography.replace('[', '').replace(']', '').replace('\n', ''))
@@ -204,9 +210,10 @@ for path, transform_path, homography in tqdm(islice(zip(df_imges["image_path"], 
     for count, box in enumerate(box_text):
         
         center = np.sum(box[:,0])/len(box),np.sum(box[:,1])/len(box)
-        text = read.readText(trans_img, box, display=False)
+        text, letter_points = read.readText(trans_img, box, RETURN_PIXEL_HEIGHT=True)
         #print("\n text was found: " , text)
         # Define the values you want to write to the CSV file
+        
         picturename = image_filename_without_extension
         size_value = size[k]
         coordinates = center
@@ -214,6 +221,10 @@ for path, transform_path, homography in tqdm(islice(zip(df_imges["image_path"], 
         orientation_value = current_orientation[i]
         text_on_box = text
         real_box = list(map(lambda x: list(pp.transformed_to_original_pixel(trans_img,x, homography)), box))
+        if (letter_points == np.array([0, 0])).all():
+            text_size = "nan" 
+        else:    
+            text_size = pps._get_size(letter_points, trans_img, depth_data, homography)
         
 
         # Extract the bounding area
@@ -254,18 +265,24 @@ for path, transform_path, homography in tqdm(islice(zip(df_imges["image_path"], 
                     if  the_color == "white":
                         succesful_white += 1
                     if  the_color == "orange":
-                        succesful_orange += 1                    
+                        succesful_orange += 1   
+                
+                x1, y1 = box[0]
+                x2, y2 = box[1]
+                x3, y3 = box[2]
+                x4, y4 = box[3]
+                                    
 
-                csv_output_string = f"{image_filename_without_extension},{size_value},{orientation_value},{the_color},{text_on_box}, 4G/Y30/S/22/D/BAM "
+                csv_output_string = f"{image_filename_without_extension},{size_value},{orientation_value},{the_color},{text_on_box},4G/Y30/S/22/D/BAM,{text_size}"
                 current_set_df = current_set_df[(current_set_df['color'] != current_set_df.loc[pos, "color"])]
                 
                 output_list.append(csv_output_string)
-            
+                print(csv_output_string)           
     for index, row in current_set_df.iterrows():
         the_color = row["color"]
         the_color = the_color.replace("  ", "")
 
-        csv_output_string = f"{image_filename_without_extension},{size_value},{orientation_value},{the_color},nan, 4G/Y30/S/22/D/BAM"
+        csv_output_string = f"{image_filename_without_extension},{size_value},{orientation_value},{the_color},nan,4G/Y30/S/22/D/BAM,nan"
         output_list.append(csv_output_string)
             
 
@@ -273,7 +290,7 @@ for path, transform_path, homography in tqdm(islice(zip(df_imges["image_path"], 
    
     # Open the CSV file in append mode
 with open(csv_file_path_output, mode='w', newline='') as file:
-    file.write("picturename,size,orientation,background_color,read_text,ground_truth_text\n")    
+    file.write("picturename,size,orientation,background_color,read_text,ground_truth_text,detected_text_size\n")    
     for string in output_list:
         file.write(string + "\n")
         
