@@ -112,4 +112,14 @@ class Segmentation:
         return self._image_segment(self.TSUmodel,image_np, out_x, out_y)
     def locateLithium(self,image_np, out_x=1920, out_y=1080):
         return self._image_segment(self.Lithiummodel,image_np, out_x, out_y)
+    def generateMasks(self, img):
+        mask1 = self.locateHazard(img)
+        mask2 = self.locateCao(img)
+        mask3 = self.locateLithium(img)
+        mask4 = self.locatePS(img)
+        mask5 = self.locateTSU(img)
+        mask6 = self.locateUN(img)
+        masks = [mask1, mask2, mask3, mask4, mask5, mask6]
+        return masks
+        
     
