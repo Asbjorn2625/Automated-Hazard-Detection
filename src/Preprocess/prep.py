@@ -90,13 +90,16 @@ class PreProcess:
                 # Remove the plane points from the point cloud.
                 point_cloud = point_cloud.select_by_index(inliers, invert=True)
                 continue
+            # Extract the plane points and remove them from the point cloud.
+            plane_inliers = point_cloud.select_by_index(inliers)
+            point_cloud = point_cloud.select_by_index(inliers, invert=True)
             # Find the angle difference to the camera's optical axis
             angle_diff = abs(angle_x)
             if angle_diff < min_angle_diff:
                 min_angle_diff = angle_diff
-                # Extract the plane points and remove them from the point cloud.
-                best_plane_inliers = point_cloud.select_by_index(inliers)
-                best_plane_normal_vector = point_cloud.select_by_index(inliers, invert=True)
+                # Save if it is the best angle
+                best_plane_inliers = plane_inliers
+                best_plane_normal_vector = point_cloud
         # In case there is nothing to be found
         if best_plane_inliers is None:
             return (np.zeros_like(img), None) if mask is None else (np.zeros_like(img), None, np.zeros_like(mask))
