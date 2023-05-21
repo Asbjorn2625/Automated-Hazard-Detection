@@ -120,6 +120,9 @@ class Segmentation:
         mask5 = self.locateTSU(img)
         mask6 = self.locateUN(img)
         masks = [mask1, mask2, mask3, mask4, mask5, mask6]
+        for x in range(len(masks)):
+            masks[x] = cv2.cvtColor(masks[x], cv2.COLOR_BGR2GRAY)
+            
         return masks
         
     

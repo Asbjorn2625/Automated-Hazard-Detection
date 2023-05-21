@@ -105,7 +105,7 @@ class ReadText:
         
         # Rotate the image to follow the horizontal axis
         if cv2.countNonZero(cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY)) < 0:
-            return "" if not RETURN_PIXEL_HEIGHT else "", 0
+            return ["", 0] if RETURN_PIXEL_HEIGHT else ""
     
         
         # Convert to grayscale
@@ -142,7 +142,7 @@ class ReadText:
         segmented = self._remove_edge_blobs(dilated_image)
         
         if cv2.countNonZero(segmented) < 0:
-             return "" if not RETURN_PIXEL_HEIGHT else "", 0
+             return ["", 0] if RETURN_PIXEL_HEIGHT else ""
             
         #checking for the pixle height of the letters
         if RETURN_PIXEL_HEIGHT:
@@ -186,7 +186,7 @@ class ReadText:
            
             text = pytesseract.image_to_string(segmented, config=config)
     
-        return text.strip() if not RETURN_PIXEL_HEIGHT else text.strip(), points
+        return [text.strip(), points] if RETURN_PIXEL_HEIGHT else text.strip()
     
     
     def _remove_edge_blobs(self, img):

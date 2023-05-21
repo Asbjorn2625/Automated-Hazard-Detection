@@ -14,7 +14,7 @@ class ProperShippingName(Classifier):
     
     def classify(self, image, depth_map, mask, homography):
         # Put the classification code here
-        
+        image = cv2.bitwise_and(image, image, mask=mask)
         # get the bounding box of the text
         boxes = self.reader.findText(image)
         text_list = []
@@ -23,8 +23,9 @@ class ProperShippingName(Classifier):
             # Get the size of the text
             text_size = self._get_size(box, image, depth_map, homography)
             # read the text
-            text = self.reader.readText(image, box)  # Maybe consider changing the whitelist here to only cover the letters in the proper shipping name
-            text_list.append({"text":text, "size":text_size})
+            text = self.reader.readText(image, box, display = False)  # Maybe consider changing the whitelist here to only cover the letters in the proper shipping name
+            text_list.append([text, text_size])
+        return text_list
             
     def _distance_between_corners(self, corner1, corner2, depth_map):
         x1, y1 = corner1

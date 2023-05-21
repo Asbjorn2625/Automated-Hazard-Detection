@@ -13,13 +13,14 @@ class HandlingLabels(Classifier):
     def __init__(self, ocr_model, preprocessor):
         # Initialize the parent class
         super().__init__(ocr_model, preprocessor)
-    
+
+        
     def classify(self, image, depth_map, mask, homography):
         # Put the classification code here
         
         # Get size of the label
         label_width, label_height = self._get_size(mask, image, depth_map, homography)
-        pass
+        return label_height, label_width
     
     def _get_corners(self, mask, contour_area_threshold=100, epsilon_ratio=0.02):
         # Find the contours of the diamond shapes
@@ -43,7 +44,7 @@ class HandlingLabels(Classifier):
                     # Append the corner coordinates to the list of corner groups
                     all_corner_groups.append(corner_coordinates)
         return all_corner_groups
-    
+        
     def _distance_between_corners(self, corner1, corner2, depth_map):
         x1, y1 = corner1
         x2, y2 = corner2
@@ -54,7 +55,7 @@ class HandlingLabels(Classifier):
         # Calculate the step size for x and y directions
         step_x = (x2 - x1) / num_steps
         step_y = (y2 - y1) / num_steps
-
+        
         # Initialize the total distance
         total_distance = 0
 
@@ -88,7 +89,9 @@ class HandlingLabels(Classifier):
 
         # Change the corners into the original image
         corner_groups = [self.pp.transformed_to_original_pixel(image, pixel, homography) for pixel in corner_groups]
-        
+        #in case there is nothing to assign
+        width = 0
+        height = 0
         # Calculate the real-life distance of the sides for each contour
         for corner_group in corner_groups:
             num_corners = len(corner_group)
@@ -108,5 +111,4 @@ class HandlingLabels(Classifier):
             height = sum(side_distances[2:]) / 2
 
         return width, height
-    
     

@@ -29,13 +29,14 @@ class Hazard_labels(Classifier):
         "Corrosive": ["CORROSIVE","8"],
         "Miscellanous": ["MISCELLANEOUS","9"],
         "Lithium Batteries": ["LITHIUM BATTERIES", "9"]}
-
+    def class_List(self):
+        return self.classes
     def classify(self, image, depth_map, mask, homography):
         # Put the classification code here
-        
-        # Get size of the label
+        match = self.written_material(image, mask)
+        # Get size of the label (can't get this to work)
         label_size = self._get_size(mask, image, depth_map, homography)
-        pass
+        return match, label_size
     
     def _get_diamond_corners(self, mask, contour_area_threshold=100, epsilon_ratio=0.02):
         # Find the contours of the diamond shapes
@@ -101,28 +102,28 @@ class Hazard_labels(Classifier):
     def _get_size(self, mask, image, depth_map, homography):
         # Get the corner coordinates of the diamond shapes
         corner_groups = self._get_diamond_corners(mask)
-
         # Change the corners into the original image
-        corner_groups = [self.pp.transformed_to_original_pixel(image, pixel, homography) for pixel in corner_groups]
-        
-        # Calculate the real-life distance of the sides for each contour
-        for corner_group in corner_groups:
-            num_corners = len(corner_group)
-            if num_corners != 4:
-                raise ValueError("Expected 4 corners for a rectangle, got {}".format(num_corners))
-            
-            side_distances = []
-            for i in range(num_corners):
-                corner1 = corner_group[i]
-                corner2 = corner_group[(i + 1) % num_corners]  # Get the next corner in the group
-                distance = self._distance_between_corners(corner1, corner2, depth_map)
-                side_distances.append(distance)
 
-            # Calculate the average distance of the sides for the current contour
-            average_distance = sum(side_distances) / num_corners
+        if len(corner_groups) != 0:
+            corner_groups = [self.pp.transformed_to_original_pixel(image, np.array(pixel), homography) for pixel in corner_groups[0]]
+            # Calculate the real-life distance of the sides for each contour
+            for corner_group in corner_groups:
+                num_corners = len(corner_group)
 
-        return average_distance
-    def written_material(self, rgb_img, mask_img):
+                side_distances = []
+                for i in range(num_corners):
+                    corner1 = corner_groups[i]
+                    corner2 = corner_groups[(i + 1) % num_corners]  # Get the next corner in the group
+                    distance = self._distance_between_corners(corner1, corner2, depth_map)
+                    side_distances.append(distance)
+
+                # Calculate the average distance of the sides for the current contour
+                average_distance = sum(side_distances) / num_corners
+            print("average distance", average_distance)
+            return average_distance
+        else:
+            return 0
+    def written_material(self, rgb_img, mask_img): 
         writtenText=[]
         masked=cv2.bitwise_and(rgb_img, rgb_img, mask=mask_img)
         ROI=self.pp.segmentation_to_ROI(mask_img)
@@ -132,7 +133,7 @@ class Hazard_labels(Classifier):
             bounding = self.reader.findText(cropped)
             config='-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\ ./- --psm 7 --oem 3'
             for boxes in bounding:
-                predtext= self.reader.readText(cropped, boxes,config=config)
+                predtext= self.reader.readText(cropped, boxes, display = False, config=config)
                 writtenText.append(predtext)
         if len(writtenText) == 0:
             return "No text found"
@@ -165,5 +166,13 @@ class Hazard_labels(Classifier):
             keys_with_highest_scores = [scores[i][0] for i in max_score_indices]
 
             return scores, keys_with_highest_scores
+            print(1)
         else:
+            print(2)
             return scores, ""
+        
+    def Haz_Ori_bent(self, mask):
+        angle = self.Orientation(mask)
+        bent = self.labels_on_edge(mask)
+            
+        return angle, bent
