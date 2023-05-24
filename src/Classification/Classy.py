@@ -48,7 +48,8 @@ class Classifier:
     
     
     def Orientation(self, img):
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        if len(img.shape) != 2:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         contours = self.calc_cnt(img)
         area = 0 
         if contours is not None:

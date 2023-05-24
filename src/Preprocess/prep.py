@@ -177,6 +177,9 @@ class PreProcess:
         return original_pixel[:2].round().astype(int)
 
     def _remove_black_box(self, image, original_x, original_y):
+        if type(original_x) is tuple:
+            print(original_x)
+            print(original_y)
         # Convert the image to grayscale
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 

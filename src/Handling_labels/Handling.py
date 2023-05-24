@@ -30,6 +30,46 @@ class HandlingLabels(Classifier):
 
         # Loop through the contours
         for contour in contours:
+
+            # Filter out small contours by area
+            if cv2.contourArea(contour) > contour_area_threshold:
+                # Approximate the contour shape
+                epsilon = epsilon_ratio * cv2.arcLength(contour, True)
+                approx = cv2.approxPolyDP(contour, epsilon, True)
+
+                # Check if the shape has 4 vertices (corners)
+                if len(approx) == 4:
+                    # Extract the corner coordinates
+                    corner_coordinates = [tuple(coord[0]) for coord in approx]
+
+                    # Append the corner coordinates to the list of corner groups
+                    all_corner_groups.append(corner_coordinates)
+                else:
+                    print(f"Warning: Found {len(approx)} points instead of 4. Using the 4 most extreme points as corners.")
+                    corners = np.zeros((4, 2), dtype=np.float32)
+                    corners[0] = tuple(contour[contour[:, :, 0].argmin()][0])  # leftmost point
+                    corners[1] = tuple(contour[contour[:, :, 1].argmin()][0])  # topmost point
+                    corners[2] = tuple(contour[contour[:, :, 0].argmax()][0])  # rightmost point
+                    corners[3] = tuple(contour[contour[:, :, 1].argmax()][0])  # bottommost point
+                    all_corner_groups.append(corners)
+            else:
+                    print(f"Warning: Found {len(approx)} points instead of 4. Using the 4 most extreme points as corners.")
+                    corners = np.zeros((4, 2), dtype=np.float32)
+                    corners[0] = tuple(contour[contour[:, :, 0].argmin()][0])  # leftmost point
+                    corners[1] = tuple(contour[contour[:, :, 1].argmin()][0])  # topmost point
+                    corners[2] = tuple(contour[contour[:, :, 0].argmax()][0])  # rightmost point
+                    corners[3] = tuple(contour[contour[:, :, 1].argmax()][0])  # bottommost point
+                    all_corner_groups.append(corners)
+                    
+        return all_corner_groups
+    def _get_diamond_corners(self, mask, contour_area_threshold=100, epsilon_ratio=0.02):
+        # Find the contours of the diamond shapes
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        all_corner_groups = []
+
+        # Loop through the contours
+        for contour in contours:
             # Filter out small contours by area
             if cv2.contourArea(contour) > contour_area_threshold:
                 # Approximate the contour shape
@@ -44,6 +84,7 @@ class HandlingLabels(Classifier):
                     # Append the corner coordinates to the list of corner groups
                     all_corner_groups.append(corner_coordinates)
         return all_corner_groups
+    
         
     def _distance_between_corners(self, corner1, corner2, depth_map):
         x1, y1 = corner1
@@ -55,7 +96,7 @@ class HandlingLabels(Classifier):
         # Calculate the step size for x and y directions
         step_x = (x2 - x1) / num_steps
         step_y = (y2 - y1) / num_steps
-        
+
         # Initialize the total distance
         total_distance = 0
 
@@ -84,31 +125,26 @@ class HandlingLabels(Classifier):
         return total_distance
     
     def _get_size(self, mask, image, depth_map, homography):
-        # Get the corner coordinates of the shapes
-        corner_groups = self._get_corners(mask)
-
+        # Get the corner coordinates of the diamond shapes
+        corner_groups = self._get_diamond_corners(mask)
         # Change the corners into the original image
-        corner_groups = [self.pp.transformed_to_original_pixel(image, pixel, homography) for pixel in corner_groups]
-        #in case there is nothing to assign
-        width = 0
-        height = 0
-        # Calculate the real-life distance of the sides for each contour
-        for corner_group in corner_groups:
-            num_corners = len(corner_group)
-            if num_corners != 4:
-                raise ValueError("Expected 4 corners for a rectangle, got {}".format(num_corners))
-        
-            # Calculate the distances between consecutive corners
-            side_distances = []
-            for i in range(num_corners):
-                corner1 = corner_group[i]
-                corner2 = corner_group[(i + 1) % num_corners]  # Get the next corner in the group
-                distance = self._distance_between_corners(corner1, corner2, depth_map)
-                side_distances.append(distance)
 
-            # Average the two smallest distances and the two largest distances
-            width = sum(side_distances[:2]) / 2
-            height = sum(side_distances[2:]) / 2
+        if len(corner_groups) != 0:
+            corner_groups = [self.pp.transformed_to_original_pixel(image, np.array(pixel), homography) for pixel in corner_groups[0]]
+            # Calculate the real-life distance of the sides for each contour
+            for corner_group in corner_groups:
+                num_corners = len(corner_group)
 
-        return width, height
-    
+                side_distances = []
+                for i in range(num_corners):
+                    corner1 = corner_groups[i]
+                    corner2 = corner_groups[(i + 1) % num_corners]  # Get the next corner in the group
+                    distance = self._distance_between_corners(corner1, corner2, depth_map)
+                    side_distances.append(distance)
+
+                # Calculate the average distance of the sides for the current contour
+                average_distance = sum(side_distances) / num_corners
+            print("average distance", average_distance)
+            return average_distance, average_distance
+        else:
+            return 0

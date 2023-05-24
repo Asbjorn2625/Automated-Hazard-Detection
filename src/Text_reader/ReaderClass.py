@@ -64,7 +64,7 @@ class ReadText:
         return np.array(final_result)
 
     
-    def readText(self, image, box, display=True, config='-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./- --psm 7 --oem 3', padding=10, RETURN_PIXEL_HEIGHT = False):
+    def readText(self, image, box, display=True, config='-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.\ /- --psm 7 --oem 3', padding=5, RETURN_PIXEL_HEIGHT = False):
         """
         Function for extracting text given a text area and a image.
         
@@ -86,6 +86,9 @@ class ReadText:
         ymin = min(y1, y2, y3, y4)
         ymax = max(y1, y2, y3, y4)
 
+        if (xmax - xmin) > 70:
+            padding = padding + 20
+        
         # Padding is to make sure we get the entire text
         xmin = int(xmin) - padding
         xmax = int(xmax) + padding
@@ -116,6 +119,7 @@ class ReadText:
 
         # Apply normalize the image
         equalized = cv2.normalize(gray, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+
         
         # Increase the size to better morph the image without damaging the detected text
         scale_factor = 3

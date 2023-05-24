@@ -33,6 +33,7 @@ class Package(Classifier):
         self.cert_XYZ_true = None
         self.pass1, self.pass2, self.pass3, self.pass4, self.pass5, self.pass6, self.pass7 = "fail", "fail", "fail", "fail", "fail", "fail", "fail"
         self.TSU_list = []
+        self.cert_text = []
         
     def main(self, img, depth, row_nr):
         self.img = img
@@ -62,10 +63,11 @@ class Package(Classifier):
     def log_full(self):
         if self.TSU_list == [True, False, True, False] or self.TSU_list == [False, True, False, True]:
             self.pass6 = "pass"
-        with open('fulloutput.csv', 'a', newline='') as f:
+        with open('fulloutput1.csv', 'a', newline='') as f:
             full_data = ["Package type = " + self.pass1] +["weight test = " + self.pass2] + ["UN_nr = " + self.pass3] + ["Hazard = " + self.pass4] + ["Handeling = " + self.pass5] + ["TSU = " + self.pass6]
             writer = csv.writer(f)
             writer.writerow(full_data)
+        self.TSU_list = []
         self.pass1, self.pass2, self.pass3, self.pass4, self.pass5, self.pass6, self.pass7 = "fail", "fail", "fail", "fail", "fail", "fail", "fail"
     def log_img(self,input, csv_path):
         with open(csv_path, 'a', newline='') as f:
@@ -84,16 +86,21 @@ class Package(Classifier):
         
         self.log_img(self.mask_truth, 'mask_truth.csv')
         #checking packaging for errors
-        cert = self.Isolate_cert(self.trans_img, masks[5])
-
-        values = []
-        if self.mask_truth[5]:
+        
+        if "X" not in self.Weight and "Y" not in self.Weight and "Z" not in self.Weight:
+            self.pass2 = "N/A"
+            self.pass1 = "N/A"
+            self.log_img(["None needed"], 'cert_text.csv')
+        elif self.mask_truth[5]:
+            values= []
+            #checking packaging for errors
+            cert = self.Isolate_cert(self.trans_img, masks[5])
             box_count = self.reader.findText(cert)
             for box in box_count:
                 self.cert_text.append(self.reader.readText(cert, box, display = False))
-                self.log_img(self.cert_text, 'cert_text.csv')
+            self.log_img(self.cert_text, 'cert_text.csv')
             for string in self.cert_text:
-                Pac_values = re.findall('4G', string)
+                Pac_values = re.findall(self.packaging, string)
                 if len(Pac_values) > 0:
                     self.pass1 = "pass"
                     values = re.findall(r'Z\d+(?:\.\d+)?', string)
@@ -105,23 +112,25 @@ class Package(Classifier):
                 values = re.findall(r'X\d+(?:\.\d+)?', string)
                 if len(values) > 0:
                     break
-            numbers1 = re.findall(r'\d+(?:\.\d+)?', self.Weight)
-            numbers2 = re.findall(r'\d+(?:\.\d+)?', values[0])
-            if len(numbers1) < 1:
-                numbers1 = 0
-            else:
-                numbers1  = numbers1[0]
-            if float(numbers2[0]) > float(numbers1):
-                self.pass2 = "pass"
-                if "Z" in values[0]:
-                    self.pass2 = "pass"
-                elif "Y" in values[0]:
-                    if "Y" in self.Weight or "X" in self.Weight:
+            if len(values) > 0:
+                numbers1 = re.findall(r'\d+(?:\.\d+)?', self.Weight)
+                numbers2 = re.findall(r'\d+(?:\.\d+)?', values[0])
+                if len(numbers1) < 1:
+                    numbers1 = 0
+                else:
+                    numbers1  = numbers1[0]
+                if float(numbers2[0]) > float(numbers1):
+                    if "Z" in values[0]:
                         self.pass2 = "pass"
-                elif "X" in values[0]:
-                    if "X" in self.Weight:
-                        self.pass2 = "pass"
+                    elif "Y" in values[0]:
+                        if "Y" in self.Weight or "X" in self.Weight:
+                            self.pass2 = "pass"
+                    elif "X" in values[0]:
+                        if "X" in self.Weight:
+                            self.pass2 = "pass"
+        
         else: self.log_img(["None found"], 'cert_text.csv')
+        self.cert_text = []
         
         #Checking PS
         text_list = []
@@ -133,7 +142,7 @@ class Package(Classifier):
         for x in range(len(text_list)):
             for text in text_list[x]:
                 if text[1] > 6:
-                    if "UN" in text[0] and self.UN_nr in text[0]:
+                    if self.UN_nr in text[0]:
                         self.pass3 = "pass"
         
         
@@ -147,11 +156,11 @@ class Package(Classifier):
                     if height >= 115 and width >= 105:
                         self.pass5 = "pass"
             else: self.log_img(["None found"], 'CAO.csv')
-            if self.Handeling == "Lithium bat" and self.mask_truth[3]:
-                self.pass5 = "pass"
+            if self.Handeling == "Lithium bat":
+                if self.mask_truth[3]:
+                    self.pass5 = "pass"
             if self.Handeling == "Enviormental damage":
-                self.pass5 = "Env"
-            
+                self.pass5 = "Env"    
         else:
             self.log_img(["None found"], 'CAO.csv')
             self.pass5 = "N/A"
@@ -192,17 +201,49 @@ class Package(Classifier):
                 haz_data = haz_data + ["Haz_classes = "] + [Haz_classes] + ["Haz_size = "] + [Haz_size]
                 if Haz_size > 95:
                     self.log_img(haz_data, "Haz.csv")
-                    Haz_amount = len(Haz_classes)
+                    haz_string = str(self.Hazard)
+                    haz_string = haz_string.replace(" ", "")
+                    haz_amount = "1"
+                    if "or" in haz_string:
+                        self.Hazard = self.Hazard.split("or")
+                    else:
+                        haz_string = re.sub("[a-zA-Z]", "", haz_string)
+                        self.Hazard = haz_string.split(",")
+                        haz_amount = str(len(self.Hazard))
+                    haz_count = 0
                     for Haz_class in Haz_classes:
-                        print(Haz_class)
-                        if Haz_class == self.find_class(self.Haz_lab.class_List(), self.Hazard):
-                            self.pass4 = "pass"
+                        for haz in self.Hazard:
+                            if Haz_class == self.find_class(self.Haz_lab.class_List(), haz):
+                                haz_count += 1
+                    self.pass4 = str(haz_count) + "/" + haz_amount
                 else: self.log_img(haz_data, "Haz.csv")
             else: self.log_img(haz_data, "Haz.csv")
         else: self.log_img(["None found"], "Haz.csv")
 
-                    
+    def Isolate_cert(self, img, mask):
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        height, width = mask.shape[:2]
+        dilated_mask = np.zeros((height, width), dtype=np.uint8)
+        dilation_size_y1 = 1000
+        dilation_size_x1 = 50
+        kernel1 = np.ones((dilation_size_y1, dilation_size_x1), np.uint8)
+        dilation_size_y2 = 50
+        dilation_size_x2 = 1000
+        kernel2 = np.ones((dilation_size_y2, dilation_size_x2), np.uint8)
+        # Iterate through each contour
+        for contour in contours:
+            # Draw the contour on the mask and fill it
+            cv2.drawContours(dilated_mask, [contour], -1, (255), thickness=-1)
 
+        # Dilate the mask to expand the contours
+        img_masked1 = cv2.dilate(dilated_mask, kernel1)
+        img_masked2 = cv2.dilate(dilated_mask, kernel2)
+        img_masked = cv2.bitwise_or(img_masked1, img_masked2)
+        img_masked = cv2.resize(img_masked, (img.shape[1], img.shape[0]))
+        img_masked = cv2.bitwise_and(img, img, mask=img_masked)
+        img_res = cv2.resize(img_masked, (562,562))
+        return img_masked              
+    
         
     def find_class(self,classes, number):
         for class_name, identifiers in classes.items():

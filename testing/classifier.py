@@ -145,8 +145,8 @@ class Classifier:
         UN_mask = self.seg.locateUN(img)
         
         
-        UN_mask = cv2.cvtColor(UN_mask, cv2.COLOR_BGR2GRAY)
-        contours, _ = cv2.findContours(UN_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         height, width = UN_mask.shape[:2]
         dilated_mask = np.zeros((height, width), dtype=np.uint8)
         dilation_size_y1 = 1000

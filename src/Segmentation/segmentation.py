@@ -69,7 +69,7 @@ class Segmentation:
             print("Models loaded")
             
             
-    def _image_segment(self,model,image_np, out_x=1920, out_y=1080):
+    def _image_segment(self,model,image_np, out_x=1920, out_y=1080, cut_off_threshold = 0.5):
         # Ensure the input is a NumPy array with the correct data type
         assert isinstance(image_np, np.ndarray), "Input must be a numpy.ndarray"
         assert image_np.dtype == np.uint8, "Input array must have dtype 'uint8'"
@@ -89,7 +89,7 @@ class Segmentation:
         # Perform a forward pass and create a binary segmentation mask
         with torch.no_grad():
             preds = torch.sigmoid(model(x))
-            preds = (preds > 0.8).float()
+            preds = (preds > cut_off_threshold).float()
         preds = preds.cpu().numpy()
         if preds.shape[0] == 1:
             preds = preds.squeeze(0)
@@ -100,17 +100,17 @@ class Segmentation:
         preds = cv2.resize(preds, (out_x,out_y))
         return preds
     
-    def locateHazard(self,image_np, out_x=1920, out_y=1080):
+    def locateHazard(self,image_np, out_x=1920, out_y=1080, cut_off_threshold = 0.9):
         return self._image_segment(self.Hazardmodel, image_np, out_x, out_y)
-    def locateUN(self, image_np, out_x=1920, out_y=1080):
-        return self._image_segment(self.UNmodel, image_np, out_x, out_y)
-    def locateCao(self,image_np, out_x=1920, out_y=1080):
+    def locateUN(self, image_np, out_x=1920, out_y=1080, cut_off_threshold = 0.85):
+        return self._image_segment(self.UNmodel, image_np, out_x, out_y )
+    def locateCao(self,image_np, out_x=1920, out_y=1080, cut_off_threshold = 0.65):
         return self._image_segment(self.CAOmodel, image_np, out_x, out_y)
-    def locatePS(self,image_np, out_x=1920, out_y=1080):
+    def locatePS(self,image_np, out_x=1920, out_y=1080, cut_off_threshold = 0.65):
         return self._image_segment(self.PSmodel, image_np, out_x, out_y)
-    def locateTSU(self,image_np, out_x=1920, out_y=1080):
+    def locateTSU(self,image_np, out_x=1920, out_y=1080, cut_off_threshold = 0.45):
         return self._image_segment(self.TSUmodel,image_np, out_x, out_y)
-    def locateLithium(self,image_np, out_x=1920, out_y=1080):
+    def locateLithium(self,image_np, out_x=1920, out_y=1080, cut_off_threshold = 0.85):
         return self._image_segment(self.Lithiummodel,image_np, out_x, out_y)
     def generateMasks(self, img):
         mask1 = self.locateHazard(img)
